@@ -340,17 +340,23 @@ static INPUT_PORTS_START( turbo16k )
 	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_G) PORT_CHANGED_MEMBER(DEVICE_SELF, turbo16k_state, go_button, 0) PORT_NAME("Go")
 
 	PORT_START("FREQ")
-	PORT_BIT(0x88, 0x80, IPT_CUSTOM) // 12MHz
+	PORT_CONFNAME( 0x88, 0x80, "CPU Frequency" ) PORT_CHANGED_MEMBER(DEVICE_SELF, turbo16k_state, change_cpu_freq, 0) // factory set
+	PORT_CONFSETTING(    0x00, "4MHz (unofficial)" )
+	PORT_CONFSETTING(    0x08, "8MHz (Companion III, Express 16K)" )
+	PORT_CONFSETTING(    0x80, "12MHz (Turbo 16K, Astral)" )
+	PORT_CONFSETTING(    0x88, "16MHz (unofficial)" )
 	PORT_BIT(0x77, IP_ACTIVE_LOW, IPT_UNUSED)
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( compan3 )
 	PORT_INCLUDE( turbo16k )
 
-	PORT_MODIFY("FREQ")
+	PORT_MODIFY("FREQ") // default to 8MHz
 	PORT_CONFNAME( 0x88, 0x08, "CPU Frequency" ) PORT_CHANGED_MEMBER(DEVICE_SELF, turbo16k_state, change_cpu_freq, 0) // factory set
-	PORT_CONFSETTING(    0x08, "8MHz (Companion III)" )
-	PORT_CONFSETTING(    0x80, "12MHz (Astral)" )
+	PORT_CONFSETTING(    0x00, "4MHz (unofficial)" )
+	PORT_CONFSETTING(    0x08, "8MHz (Companion III, Express 16K)" )
+	PORT_CONFSETTING(    0x80, "12MHz (Turbo 16K, Astral)" )
+	PORT_CONFSETTING(    0x88, "16MHz (unofficial)" )
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( conquist )
@@ -375,17 +381,24 @@ static INPUT_PORTS_START( conquist )
 	PORT_BIT(0x20, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_U) PORT_NAME("Set Up")
 	PORT_BIT(0x40, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_S) PORT_NAME("Stop")
 	PORT_BIT(0x80, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_I) PORT_NAME("Info")
+
+	PORT_MODIFY("FREQ")
+	PORT_CONFNAME( 0x88, 0x80, "CPU Frequency" ) PORT_CHANGED_MEMBER(DEVICE_SELF, turbo16k_state, change_cpu_freq, 0) // factory set
+	PORT_CONFSETTING(    0x08, "8MHz (Team-Mate)" )
+	PORT_CONFSETTING(    0x80, "12MHz (Conquistador)" )
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( tmate )
 	PORT_INCLUDE( conquist )
 
-	PORT_MODIFY("FREQ")
-	PORT_BIT(0x88, 0x08, IPT_CUSTOM) // 8MHz
+	PORT_MODIFY("FREQ") // default to 8MHz
+	PORT_CONFNAME( 0x88, 0x08, "CPU Frequency" ) PORT_CHANGED_MEMBER(DEVICE_SELF, turbo16k_state, change_cpu_freq, 0) // factory set
+	PORT_CONFSETTING(    0x08, "8MHz (Team-Mate)" )
+	PORT_CONFSETTING(    0x80, "12MHz (Conquistador)" )
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( t1850 )
-	PORT_INCLUDE( turbo16k )
+	PORT_INCLUDE( compan3 )
 
 	PORT_MODIFY("IN.0")
 	PORT_BIT(0x40, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_S) PORT_NAME("Sound")
@@ -396,9 +409,6 @@ static INPUT_PORTS_START( t1850 )
 
 	PORT_MODIFY("RESET")
 	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_O) PORT_CHANGED_MEMBER(DEVICE_SELF, turbo16k_state, go_button, 0) PORT_NAME("Power On")
-
-	PORT_MODIFY("FREQ")
-	PORT_BIT(0x88, 0x08, IPT_CUSTOM) // 8MHz
 INPUT_PORTS_END
 
 
@@ -505,10 +515,10 @@ ROM_END
 *******************************************************************************/
 
 //    YEAR  NAME      PARENT    COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY, FULLNAME, FLAGS
-SYST( 1986, turbo16k, 0,        0,      turbo16k, turbo16k, turbo16k_state, empty_init, "SciSys / Heuristic Software", "Turbo 16K", MACHINE_SUPPORTS_SAVE | MACHINE_CLICKABLE_ARTWORK )
-SYST( 1986, compan3,  turbo16k, 0,      compan3,  compan3,  turbo16k_state, empty_init, "SciSys / Heuristic Software", "Companion III", MACHINE_SUPPORTS_SAVE | MACHINE_CLICKABLE_ARTWORK )
+SYST( 1986, turbo16k, 0,        0,      turbo16k, turbo16k, turbo16k_state, empty_init, "SciSys / Heuristic Software", "Turbo 16K", MACHINE_SUPPORTS_SAVE )
+SYST( 1986, compan3,  turbo16k, 0,      compan3,  compan3,  turbo16k_state, empty_init, "SciSys / Heuristic Software", "Companion III", MACHINE_SUPPORTS_SAVE )
 
-SYST( 1988, conquist, 0,        0,      conquist, conquist, conquist_state, empty_init, "Saitek / Heuristic Software", "Kasparov Conquistador", MACHINE_SUPPORTS_SAVE | MACHINE_CLICKABLE_ARTWORK )
-SYST( 1988, tmate,    conquist, 0,      tmate,    tmate,    conquist_state, empty_init, "Saitek / Heuristic Software", "Kasparov Team-Mate", MACHINE_SUPPORTS_SAVE | MACHINE_CLICKABLE_ARTWORK )
+SYST( 1988, conquist, 0,        0,      conquist, conquist, conquist_state, empty_init, "Saitek / Heuristic Software", "Kasparov Conquistador", MACHINE_SUPPORTS_SAVE )
+SYST( 1988, tmate,    conquist, 0,      tmate,    tmate,    conquist_state, empty_init, "Saitek / Heuristic Software", "Kasparov Team-Mate", MACHINE_SUPPORTS_SAVE )
 
-SYST( 1986, t1850,    0,        0,      t1850,    t1850,    turbo16k_state, empty_init, "Tandy Corporation / SciSys / Heuristic Software", "1850 Deluxe Table Chess (model 60-2199)", MACHINE_SUPPORTS_SAVE | MACHINE_CLICKABLE_ARTWORK )
+SYST( 1986, t1850,    0,        0,      t1850,    t1850,    turbo16k_state, empty_init, "Tandy Corporation / SciSys / Heuristic Software", "1850 Deluxe Table Chess (model 60-2199)", MACHINE_SUPPORTS_SAVE )

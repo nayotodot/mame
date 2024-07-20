@@ -136,28 +136,17 @@ void spi_sdcard_device::latch_in()
 	if (m_cur_bit == 8)
 	{
 		LOGMASKED(LOG_SPI, "SDCARD: got %02x\n", m_in_latch);
-		for (u8 i = 0; i < 5; i++)
+		if (m_state == SD_STATE_WRITE_WAITFE)
 		{
-			m_cmd[i] = m_cmd[i + 1];
-		}
-		m_cmd[5] = m_in_latch;
-
-		switch (m_state)
-		{
-		case SD_STATE_IDLE:
-			do_command();
-			break;
-
-		case SD_STATE_WRITE_WAITFE:
 			if (m_in_latch == 0xfe)
 			{
 				m_state = SD_STATE_WRITE_DATA;
 				m_out_latch = 0xff;
 				m_write_ptr = 0;
 			}
-			break;
-
-		case SD_STATE_WRITE_DATA:
+		}
+		else if (m_state == SD_STATE_WRITE_DATA)
+		{
 			m_data[m_write_ptr++] = m_in_latch;
 			if (m_write_ptr == (m_blksize + 2))
 			{
@@ -174,26 +163,29 @@ void spi_sdcard_device::latch_in()
 
 				send_data(2, SD_STATE_IDLE);
 			}
-			break;
+		}
+		else // receive CMD
+		{
+			std::memmove(m_cmd, m_cmd + 1, 5);
+			m_cmd[5] = m_in_latch;
 
-		case SD_STATE_DATA_MULTI:
-			do_command();
-			if (m_state == SD_STATE_DATA_MULTI && m_out_count == 0)
+			if (m_state == SD_STATE_DATA_MULTI)
 			{
-				m_data[0] = 0xfe; // data token
-				m_image->read(m_blknext++, &m_data[1]);
-				util::crc16_t crc16 = util::crc16_creator::simple(&m_data[1], m_blksize);
-				put_u16be(&m_data[m_blksize + 1], crc16);
-				send_data(1 + m_blksize + 2, SD_STATE_DATA_MULTI);
+				do_command();
+				if (m_state == SD_STATE_DATA_MULTI && m_out_count == 0)
+				{
+					m_data[0] = 0xfe; // data token
+					m_image->read(m_blknext++, &m_data[1]);
+					util::crc16_t crc16 = util::crc16_creator::simple(&m_data[1], m_blksize);
+					put_u16be(&m_data[m_blksize + 1], crc16);
+					LOG("reading LBA %x: [0] %02x %02x .. [%d] %02x %02x [crc16] %04x\n", m_blknext - 1, m_data[1], m_data[2], m_blksize - 2, m_data[m_blksize - 1], m_data[m_blksize], crc16);
+					send_data(1 + m_blksize + 2, SD_STATE_DATA_MULTI);
+				}
 			}
-			break;
-
-		default:
-			if (((m_cmd[0] & 0x70) == 0x40) || (m_out_count == 0)) // CMD0 - GO_IDLE_STATE
+			else if ((m_state == SD_STATE_IDLE) || (((m_cmd[0] & 0x70) == 0x40) || (m_out_count == 0))) // CMD0 - GO_IDLE_STATE
 			{
 				do_command();
 			}
-			break;
 		}
 	}
 }
@@ -365,11 +357,11 @@ void spi_sdcard_device::do_command()
 				{
 					blk /= m_blksize;
 				}
-				LOG("reading LBA %x\n", blk);
 				m_image->read(blk, &m_data[3]);
 				{
 					util::crc16_t crc16 = util::crc16_creator::simple(&m_data[3], m_blksize);
 					put_u16be(&m_data[m_blksize + 3], crc16);
+					LOG("reading LBA %x: [0] %02x %02x .. [%d] %02x %02x [crc16] %04x\n", blk, m_data[3], m_data[4], m_blksize - 2, m_data[m_blksize + 1], m_data[m_blksize + 2], crc16);
 				}
 				send_data(3 + m_blksize + 2, SD_STATE_DATA);
 			}
@@ -445,28 +437,16 @@ void spi_sdcard_device::do_command()
 			break;
 
 		default:
-			LOGMASKED(LOG_COMMAND, "SDCARD: Unsupported %02x\n", m_cmd[0] & 0x3f);
+			LOGMASKED(LOG_COMMAND, "SDCARD: Unsupported CMD%02d\n", m_cmd[0] & 0x3f);
 			clean_cmd = false;
 			break;
 		}
 
 		// if this is command 55, that's a prefix indicating the next command is an "app command" or "ACMD"
-		if ((m_cmd[0] & 0x3f) == 55)
-		{
-			m_bACMD = true;
-		}
-		else
-		{
-			m_bACMD = false;
-		}
+		m_bACMD = (m_cmd[0] & 0x3f) == 55;
 
 		if (clean_cmd)
-		{
-			for (u8 i = 0; i < 6; i++)
-			{
-				m_cmd[i] = 0xff;
-			}
-		}
+			memset(m_cmd, 0xff, 6);
 	}
 }
 

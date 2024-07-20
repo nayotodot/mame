@@ -112,12 +112,14 @@ const double XTAL::known_xtals[] = {
 	  4'032'000, /* 4.032_MHz_XTAL         GRiD Compass modem board */
 	  4'096'000, /* 4.096_MHz_XTAL         Used to drive OKI M9810 chips */
 	  4'194'304, /* 4.194304_MHz_XTAL      Used to drive MC146818 / Nintendo Game Boy */
+	  4'220'000, /* 4.220_MHz_XTAL         Used to drive OKI M6295 chips on some Namco boards, usually with /4 divider */
 	  4'224'000, /* 4.224_MHz_XTAL         Used to drive OKI M6295 chips, usually with /4 divider */
 	  4'410'000, /* 4.41_MHz_XTAL          Pioneer PR-8210 ldplayer */
 	  4'433'610, /* 4.43361_MHz_XTAL       Cidelsa Draco */
 	  4'433'619, /* 4.433619_MHz_XTAL      PAL color subcarrier (technically 4.43361875mhz)*/
 	  4'608'000, /* 4.608_MHz_XTAL         Luxor ABC-77 keyboard (Keytronic custom part #48-300-107 is equivalent) */
 	  4'915'200, /* 4.9152_MHz_XTAL        - */
+	  4'952'000, /* 4.952_MHz_XTAL         IGS M036 based mahjong games, for TT5665 sound chip */
 	  5'000'000, /* 5_MHz_XTAL             Mutant Night */
 	  5'068'800, /* 5.0688_MHz_XTAL        Usually used as MC2661 or COM8116 baud rate clock */
 	  5'185'000, /* 5.185_MHz_XTAL         Intel INTELLEC® 4 */
@@ -163,6 +165,7 @@ const double XTAL::known_xtals[] = {
 	  8'960'000, /* 8.96_MHz_XTAL          Casio CZ-101 (divided by 2 for Music LSI) */
 	  9'000'000, /* 9_MHz_XTAL             Homedata PCBs */
 	  9'216'000, /* 9.216_MHz_XTAL         Univac UTS 20 */
+	  9'263'750, /* 9.263750_MHz_XTAL      Sai Yu Gou Ma Roku bootleg */
 	  9'400'000, /* 9.4_MHz_XTAL           Yamaha MU-5 and TG-100 */
 	  9'426'500, /* 9.4265_MHz_XTAL        Yamaha DX7, and DX9 */
 	  9'600'000, /* 9.6_MHz_XTAL           WD37C65 second clock (for 300 KB/sec rate) */
@@ -174,6 +177,7 @@ const double XTAL::known_xtals[] = {
 	  9'987'000, /* 9.987_MHz_XTAL         Crazy Balloon */
 	 10'000'000, /* 10_MHz_XTAL            - */
 	 10'137'600, /* 10.1376_MHz_XTAL       Wyse WY-100 */
+	 10'240'000, /* 10.240_MHz_XTAL        Stella 8085 based fruit machines */
 	 10'245'000, /* 10.245_MHz_XTAL        PES Speech box */
 	 10'380'000, /* 10.38_MHz_XTAL         Fairlight Q219 Lightpen/Graphics Card */
 	 10'480'000, /* 10.48_MHz_XTAL         System-80 (50 Hz) */
@@ -209,7 +213,6 @@ const double XTAL::known_xtals[] = {
 	 12'292'000, /* 12.292_MHz_XTAL        Northwest Digitial Systems GP-19 */
 	 12'324'000, /* 12.324_MHz_XTAL        Otrona Attache */
 	 12'335'600, /* 12.3356_MHz_XTAL       RasterOps ColorBoard 264 (~784x NTSC line rate) */
-	 12'432'000, /* 12.432_MHz_XTAL        Kaneko Fly Boy/Fast Freddie Hardware */
 	 12'472'500, /* 12.4725_MHz_XTAL       Bonanza's Mini Boy 7 */
 	 12'480'000, /* 12.48_MHz_XTAL         TRS-80 Model II */
 	 12'500'000, /* 12.5_MHz_XTAL          Red Alert audio board */
@@ -430,6 +433,7 @@ const double XTAL::known_xtals[] = {
 	 34'000'000, /* 34_MHz_XTAL            Gaelco PCBs */
 	 34'291'712, /* 34.291712_MHz_XTAL     Fairlight CMI master card */
 	 34'846'000, /* 34.846_MHz_XTAL        Visual 550 */
+	 35'452'500, /* 35.4525_MHz_XTAL       Nokia MikroMikko 2 */
 	 35'469'000, /* 35.469_MHz_XTAL        ZX Spectrum +2/+3 (~8x PAL subcarrier) */
 	 35'640'000, /* 35.640_MHz_XTAL        HDS200 132-column display clock */
 	 35'834'400, /* 35.8344_MHz_XTAL       Tab Products E-22 132-column display clock */
@@ -473,6 +477,7 @@ const double XTAL::known_xtals[] = {
 	 51'200'000, /* 51.2_MHz_XTAL          Namco Super System 22 video clock */
 	 52'000'000, /* 52_MHz_XTAL            Cojag */
 	 52'832'000, /* 52.832_MHz_XTAL        Wang PC TIG video controller */
+	 52'867'000, /* 52.867_MHz_XTAL        Atlus Print Club (Sega C2 PCB) */
 	 53'203'424, /* 53.203424_MHz_XTAL     Master System, Mega Drive PAL (12x PAL subcarrier) */
 	 53'693'175, /* 53.693175_MHz_XTAL     PSX-based h/w, Sony ZN1-2-based (15x NTSC subcarrier) */
 	 54'000'000, /* 54_MHz_XTAL            Taito JC */

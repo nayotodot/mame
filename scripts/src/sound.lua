@@ -551,6 +551,20 @@ end
 
 
 ---------------------------------------------------
+-- Micronas DAC 3550A Stereo Audio DAC
+--@src/devices/sound/dac3350a.h,SOUNDS["DAC3350A"] = true
+---------------------------------------------------
+
+if (SOUNDS["DAC3350A"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/sound/dac3350a.cpp",
+		MAME_DIR .. "src/devices/sound/dac3350a.h",
+	}
+end
+
+
+
+---------------------------------------------------
 -- MEA8000 Voice Synthesizer
 --@src/devices/sound/mea8000.h,SOUNDS["MEA8000"] = true
 ---------------------------------------------------
@@ -680,6 +694,20 @@ if (SOUNDS["UPD7759"]~=null) then
 		MAME_DIR .. "src/devices/sound/upd7759.h",
 		MAME_DIR .. "src/devices/sound/315-5641.cpp",
 		MAME_DIR .. "src/devices/sound/315-5641.h",
+	}
+end
+
+
+
+---------------------------------------------------
+-- IMA ADPCM sample player
+--@src/devices/sound/imaadpcm.h,SOUNDS["IMAADPCM"] = true
+---------------------------------------------------
+
+if (SOUNDS["IMAADPCM"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/sound/imaadpcm.cpp",
+		MAME_DIR .. "src/devices/sound/imaadpcm.h",
 	}
 end
 
@@ -1596,14 +1624,26 @@ if (SOUNDS["XT446"]~=null) then
 end
 
 ---------------------------------------------------
--- Roland sample players
---@src/devices/sound/rolandpcm.h,SOUNDS["ROLANDPCM"] = true
+-- Roland LP-based sample players
+--@src/devices/sound/roland_lp.h,SOUNDS["ROLANDLP"] = true
 ---------------------------------------------------
 
-if (SOUNDS["ROLANDPCM"]~=null) then
+if (SOUNDS["ROLANDLP"]~=null) then
 	files {
-		MAME_DIR .. "src/devices/sound/rolandpcm.cpp",
-		MAME_DIR .. "src/devices/sound/rolandpcm.h",
+		MAME_DIR .. "src/devices/sound/roland_lp.cpp",
+		MAME_DIR .. "src/devices/sound/roland_lp.h",
+	}
+end
+
+---------------------------------------------------
+-- Roland GP-based sample players
+--@src/devices/sound/roland_gp.h,SOUNDS["ROLANDGP"] = true
+---------------------------------------------------
+
+if (SOUNDS["ROLANDGP"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/sound/roland_gp.cpp",
+		MAME_DIR .. "src/devices/sound/roland_gp.h",
 	}
 end
 

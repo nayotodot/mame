@@ -236,8 +236,10 @@ static INPUT_PORTS_START( edames ) // see comments for French version labels
 
 	PORT_START("IN.3")
 	PORT_CONFNAME( 0x03, 0x02, "CPU Frequency" ) PORT_CHANGED_MEMBER(DEVICE_SELF, edames_state, change_cpu_freq, 0) // factory set
-	PORT_CONFSETTING(    0x02, "8MHz (original)" )
-	PORT_CONFSETTING(    0x00, "12MHz (newer)" )
+	PORT_CONFSETTING(    0x03, "6MHz (unofficial)" )
+	PORT_CONFSETTING(    0x02, "8MHz (original version)" )
+	PORT_CONFSETTING(    0x01, "10MHz (unofficial)" )
+	PORT_CONFSETTING(    0x00, "12MHz (newer version)" )
 	PORT_BIT(0x04, IP_ACTIVE_LOW, IPT_KEYPAD) PORT_CODE(KEYCODE_T) PORT_NAME("Swap Side")   // Tourne Damier
 
 	PORT_START("RESET")
@@ -300,4 +302,4 @@ ROM_END
 *******************************************************************************/
 
 //    YEAR  NAME    PARENT    COMPAT  MACHINE  INPUT   CLASS         INIT        COMPANY, FULLNAME, FLAGS
-SYST( 1988, edames, 0,        0,      edames,  edames, edames_state, empty_init, "Saitek", "Electronic Dames", MACHINE_SUPPORTS_SAVE | MACHINE_CLICKABLE_ARTWORK )
+SYST( 1988, edames, 0,        0,      edames,  edames, edames_state, empty_init, "Saitek", "Electronic Dames", MACHINE_SUPPORTS_SAVE )

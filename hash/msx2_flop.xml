@@ -607,6 +607,30 @@ The following floppies came with the machines.
 		</part>
 	</software>
 
+	<software name="sunride">
+		<description>Sunrise IDE firmware (v2.50)</description>
+		<year>2013</year>
+		<publisher>Jon de Schrijder</publisher>
+		<notes>Handcrafted image containing firmware and tools.</notes>
+		<part name="flop1" interface="floppy_3_5">
+			<dataarea name="flop" size="737280">
+				<rom name="sunrise ide v2.50.dsk" size="737280" crc="7a7a505f" sha1="83d4aca1115e6a0a42f7bf481d472e4c4e5eb87d"/>
+			</dataarea>
+		</part>
+	</software>
+
+	<software name="sunride240" cloneof="sunride">
+		<description>Sunrise IDE firmware (v2.40)</description>
+		<year>2005</year>
+		<publisher>Jon de Schrijder</publisher>
+		<notes>Handcrafted image containing firmware and tools.</notes>
+		<part name="flop1" interface="floppy_3_5">
+			<dataarea name="flop" size="737280">
+				<rom name="sunrise ide v2.40.dsk" size="737280" crc="c2fca42b" sha1="ff8e67d3d5b16ea27d3bd5a6922f1d8af1d3e31a"/>
+			</dataarea>
+		</part>
+	</software>
+
 
 <!-- Disks only -->
 
@@ -23345,6 +23369,19 @@ HOMEBREW
 		</part>
 	</software>
 
+	<software name="sg1000">
+		<description>SG1000 (v0.96)</description>
+		<year>2020</year>
+		<publisher>GDX</publisher>
+		<notes>Disk image created from the released zip.</notes>
+		<info name="usage" value="Requires Musical Memory Mapper."/>
+		<part name="flop1" interface="floppy_3_5">
+			<dataarea name="flop" size="737280">
+				<rom name="sg1000 - gdx (v0.96).dsk" size="737280" crc="5a208500" sha1="25bb3937e3a67d43808f0da3f64a8eb4d5a2fa32"/>
+			</dataarea>
+		</part>
+	</software>
+
 	<software name="sh1">
 		<description>SH#1 (Japan)</description>
 		<year>1991</year>
@@ -23500,6 +23537,19 @@ HOMEBREW
 		<part name="flop1" interface="floppy_3_5">
 			<dataarea name="flop" size="737280">
 				<rom name="singular stone - tohji murakata (alt).dsk" size="737280" crc="d99def2f" sha1="fbe833bae19d233a765de2e5b60db34c942353dc" />
+			</dataarea>
+		</part>
+	</software>
+
+	<software name="sofasms">
+		<description>SofaSMS (v1.1)</description>
+		<year>2024</year>
+		<publisher>Louthrax</publisher>
+		<notes>Disk image created from the released zip.</notes>
+		<info name="usage" value="Requires MSX-DOS2 and Franky."/>
+		<part name="flop1" interface="floppy_3_5">
+			<dataarea name="flop" size="737280">
+				<rom name="sofasms - louthrax (v1.1).dsk" size="737280" crc="606110da" sha1="af361d8bd8d9309f57dbc24cae88a8acb1cadeb2"/>
 			</dataarea>
 		</part>
 	</software>

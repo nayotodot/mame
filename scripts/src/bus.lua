@@ -488,10 +488,6 @@ end
 --@src/devices/bus/ata/ataintf.h,BUSES["ATA"] = true
 ---------------------------------------------------
 
-if (MACHINES["ATAFLASH"]~=null) then
-	BUSES["ATA"] = true
-end
-
 if (BUSES["ATA"]~=null) then
 	files {
 		MAME_DIR .. "src/devices/bus/ata/atadev.cpp",
@@ -808,6 +804,8 @@ if (BUSES["BBC_TUBE"]~=null) then
 		MAME_DIR .. "src/devices/bus/bbc/tube/tube_casper.h",
 		MAME_DIR .. "src/devices/bus/bbc/tube/tube_cms6809.cpp",
 		MAME_DIR .. "src/devices/bus/bbc/tube/tube_cms6809.h",
+		MAME_DIR .. "src/devices/bus/bbc/tube/tube_matchbox.cpp",
+		MAME_DIR .. "src/devices/bus/bbc/tube/tube_matchbox.h",
 		MAME_DIR .. "src/devices/bus/bbc/tube/tube_rc6502.cpp",
 		MAME_DIR .. "src/devices/bus/bbc/tube/tube_rc6502.h",
 		MAME_DIR .. "src/devices/bus/bbc/tube/tube_x25.cpp",
@@ -1180,12 +1178,31 @@ if (BUSES["COLECO_CART"]~=null) then
 	files {
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/exp.cpp",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/exp.h",
+		MAME_DIR .. "src/devices/bus/coleco/cartridge/activision.cpp",
+		MAME_DIR .. "src/devices/bus/coleco/cartridge/activision.h",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/megacart.cpp",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/megacart.h",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/std.cpp",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/std.h",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/xin1.h",
 		MAME_DIR .. "src/devices/bus/coleco/cartridge/xin1.cpp",
+	}
+end
+
+
+---------------------------------------------------
+--
+--@src/devices/bus/coleco/expansion/expansion.h,BUSES["COLECO_EXPANSION"] = true
+---------------------------------------------------
+
+if (BUSES["COLECO_EXPANSION"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/coleco/expansion/expansion.cpp",
+		MAME_DIR .. "src/devices/bus/coleco/expansion/expansion.h",
+		MAME_DIR .. "src/devices/bus/coleco/expansion/cards.cpp",
+		MAME_DIR .. "src/devices/bus/coleco/expansion/cards.h",
+		MAME_DIR .. "src/devices/bus/coleco/expansion/sgm.cpp",
+		MAME_DIR .. "src/devices/bus/coleco/expansion/sgm.h",
 	}
 end
 
@@ -1400,6 +1417,27 @@ end
 
 ---------------------------------------------------
 --
+--@src/devices/bus/fp1000/fp1000_exp.h,BUSES["FP1000"] = true
+---------------------------------------------------
+
+if (BUSES["FP1000"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/fp1000/fp1000_exp.cpp",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1000_exp.h",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1020fd.cpp",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1020fd.h",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1030_rampack.cpp",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1030_rampack.h",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1060io.cpp",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1060io.h",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1060io_exp.cpp",
+		MAME_DIR .. "src/devices/bus/fp1000/fp1060io_exp.h",
+	}
+end
+
+
+---------------------------------------------------
+--
 --@src/devices/bus/gamate/slot.h,BUSES["GAMATE"] = true
 ---------------------------------------------------
 
@@ -1473,6 +1511,8 @@ if (BUSES["HPDIO"]~=null) then
 		MAME_DIR .. "src/devices/bus/hp_dio/hp98603b.h",
 		MAME_DIR .. "src/devices/bus/hp_dio/hp98620.cpp",
 		MAME_DIR .. "src/devices/bus/hp_dio/hp98620.h",
+		MAME_DIR .. "src/devices/bus/hp_dio/hp98624.cpp",
+		MAME_DIR .. "src/devices/bus/hp_dio/hp98624.h",
 		MAME_DIR .. "src/devices/bus/hp_dio/hp98643.cpp",
 		MAME_DIR .. "src/devices/bus/hp_dio/hp98643.h",
 		MAME_DIR .. "src/devices/bus/hp_dio/hp98644.cpp",
@@ -1563,6 +1603,8 @@ if (BUSES["IEEE488"]~=null) then
 		MAME_DIR .. "src/devices/bus/ieee488/shark.h",
 		MAME_DIR .. "src/devices/bus/ieee488/hp9122c.cpp",
 		MAME_DIR .. "src/devices/bus/ieee488/hp9122c.h",
+		MAME_DIR .. "src/devices/bus/ieee488/hp9133.cpp",
+		MAME_DIR .. "src/devices/bus/ieee488/hp9133.h",
 		MAME_DIR .. "src/devices/bus/ieee488/hp9895.cpp",
 		MAME_DIR .. "src/devices/bus/ieee488/hp9895.h",
 		MAME_DIR .. "src/devices/bus/ieee488/remote488.cpp",
@@ -1885,6 +1927,32 @@ end
 
 ---------------------------------------------------
 --
+--@src/devices/bus/mpf1/slot.h,BUSES["MPF1"] = true
+---------------------------------------------------
+
+if (BUSES["MPF1"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/mpf1/slot.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/slot.h",
+		MAME_DIR .. "src/devices/bus/mpf1/epb.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/epb.h",
+		MAME_DIR .. "src/devices/bus/mpf1/iom.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/iom.h",
+		MAME_DIR .. "src/devices/bus/mpf1/prt.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/prt.h",
+		MAME_DIR .. "src/devices/bus/mpf1/sgb.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/sgb.h",
+		MAME_DIR .. "src/devices/bus/mpf1/ssb.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/ssb.h",
+		MAME_DIR .. "src/devices/bus/mpf1/tva.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/tva.h",
+		MAME_DIR .. "src/devices/bus/mpf1/vid.cpp",
+		MAME_DIR .. "src/devices/bus/mpf1/vid.h",
+	}
+end
+
+---------------------------------------------------
+--
 --@src/devices/bus/msx/ctrl/ctrl.h,BUSES["MSX_CTRL"] = true
 ---------------------------------------------------
 
@@ -1976,6 +2044,8 @@ if (BUSES["MSX_SLOT"]~=null) then
 		MAME_DIR .. "src/devices/bus/msx/cart/easi_speech.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/fmpac.cpp",
 		MAME_DIR .. "src/devices/bus/msx/cart/fmpac.h",
+		MAME_DIR .. "src/devices/bus/msx/cart/franky.cpp",
+		MAME_DIR .. "src/devices/bus/msx/cart/franky.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/fs_sr021.cpp",
 		MAME_DIR .. "src/devices/bus/msx/cart/fs_sr021.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/fs_sr022.cpp",
@@ -1988,6 +2058,8 @@ if (BUSES["MSX_SLOT"]~=null) then
 		MAME_DIR .. "src/devices/bus/msx/cart/hfox.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/holy_quran.cpp",
 		MAME_DIR .. "src/devices/bus/msx/cart/holy_quran.h",
+		MAME_DIR .. "src/devices/bus/msx/cart/ide.cpp",
+		MAME_DIR .. "src/devices/bus/msx/cart/ide.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/ink.cpp",
 		MAME_DIR .. "src/devices/bus/msx/cart/ink.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/kanji.cpp",
@@ -2168,6 +2240,29 @@ if (BUSES["PC_JOY"]~=null) then
 		MAME_DIR .. "src/devices/bus/pc_joy/pc_joy_magnum6.h",
 		MAME_DIR .. "src/devices/bus/pc_joy/pc_joy_sw.cpp",
 		MAME_DIR .. "src/devices/bus/pc_joy/pc_joy_sw.h",
+	}
+end
+
+
+---------------------------------------------------
+--
+--@src/devices/bus/pccard/pccard.h,BUSES["PCCARD"] = true
+---------------------------------------------------
+
+if (BUSES["PCCARD"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/bus/pccard/pccard.cpp",
+		MAME_DIR .. "src/devices/bus/pccard/pccard.h",
+		MAME_DIR .. "src/devices/bus/pccard/ataflash.cpp",
+		MAME_DIR .. "src/devices/bus/pccard/ataflash.h",
+		MAME_DIR .. "src/devices/bus/pccard/k573npu.cpp",
+		MAME_DIR .. "src/devices/bus/pccard/k573npu.h",
+		MAME_DIR .. "src/devices/bus/pccard/konami_dual.cpp",
+		MAME_DIR .. "src/devices/bus/pccard/konami_dual.h",
+		MAME_DIR .. "src/devices/bus/pccard/linflash.cpp",
+		MAME_DIR .. "src/devices/bus/pccard/linflash.h",
+		MAME_DIR .. "src/devices/bus/pccard/sram.cpp",
+		MAME_DIR .. "src/devices/bus/pccard/sram.h",
 	}
 end
 
@@ -3234,6 +3329,8 @@ if (BUSES["RS232"]~=null) then
 		MAME_DIR .. "src/devices/bus/rs232/sun_kbd.h",
 		MAME_DIR .. "src/devices/bus/rs232/swtpc8212.cpp",
 		MAME_DIR .. "src/devices/bus/rs232/swtpc8212.h",
+		MAME_DIR .. "src/devices/bus/rs232/teletex800.cpp",
+		MAME_DIR .. "src/devices/bus/rs232/teletex800.h",
 		MAME_DIR .. "src/devices/bus/rs232/terminal.cpp",
 		MAME_DIR .. "src/devices/bus/rs232/terminal.h",
 		MAME_DIR .. "src/devices/bus/rs232/xvd701.cpp",
@@ -4631,6 +4728,8 @@ if (BUSES["QBUS"]~=null) then
 		MAME_DIR .. "src/devices/bus/qbus/qg640.h",
 		MAME_DIR .. "src/devices/bus/qbus/qtx.cpp",
 		MAME_DIR .. "src/devices/bus/qbus/qtx.h",
+		MAME_DIR .. "src/devices/bus/qbus/uknc_kmd.cpp",
+		MAME_DIR .. "src/devices/bus/qbus/uknc_kmd.h",
 	}
 end
 

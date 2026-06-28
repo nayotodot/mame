@@ -3,14 +3,14 @@
 
 // **** High level emulation of 8041 UPI in HP98X6 systems ****
 //
-// Configuration jumpers I identified in RAM_POS_CFG_JUMPERS register:
+// Configuration jumpers in RAM_POS_CFG_JUMPERS register:
 //
 // |  Bit | Meaning                                           |
 // |------+---------------------------------------------------|
 // |    7 | ID PROM is installed                              |
-// |    6 | ?                                                 |
-// |    5 | Enter key is named either "ENTER" or "RETURN" (?) |
-// | 4..1 | ?                                                 |
+// |    6 | UPI revision                                      |
+// |    5 | 0: HP-HIL keyboards not supported                 |
+// | 4..1 | -                                                 |
 // |    0 | Large (0) or small (1) keyboard                   |
 //
 // Sequence to read ID PROM:
@@ -27,15 +27,16 @@
 //
 // TODO:
 // - Find if FHS and delay timers are self canceling
-// - Identify more configuration jumpers
 
 #include "emu.h"
 #include "hp98x6_upi.h"
 
 #include "speaker.h"
 
+#include <bit>
+
 // Debugging
-#define VERBOSE 1
+#define VERBOSE 0
 #include "logmacro.h"
 
 
@@ -59,26 +60,6 @@ namespace {
 
 // Device type definition
 DEFINE_DEVICE_TYPE(HP98X6_UPI, hp98x6_upi_device, "hp98x6_upi", "UPI of HP98x6 systems")
-
-// ID PROM for 9816A (it comes straight from O. De Smet's emulator)
-static const uint8_t id_prom[] = {
-	0x3e,0x38,0x00,0x32,0x30,0x31,0x30,0x41,0x30,0x30,0x30,0x30,0x30,0x30,0x39,0x38,
-	0x31,0x36,0x41,0x20,0x20,0xff,0x01,0x02,0x03,0x04,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xfe,0x00,0x00,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x00,
-	0x00,0x00,0x00,0x00,0x00,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-	0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-};
 
 // Positions in internal RAM
 enum : uint8_t {
@@ -228,6 +209,7 @@ hp98x6_upi_device::hp98x6_upi_device(const machine_config &mconfig, const char *
 	, m_10ms_timer(*this, "timer")
 	, m_delay_timer(*this, "dly")
 	, m_input_delay_timer(*this, "inp_dly")
+	, m_idprom(*this, "idprom")
 	, m_irq1_write_func(*this)
 	, m_irq7_write_func(*this)
 {
@@ -267,7 +249,7 @@ void hp98x6_upi_device::device_add_mconfig(machine_config &config)
 {
 	// Beep
 	SPEAKER(config, "mono").front_center();
-	BEEP(config, m_beep, 0).add_route(ALL_OUTPUTS, "mono", 1.00);
+	BEEP(config, m_beep).add_route(ALL_OUTPUTS, "mono", 1.00);
 
 	TIMER(config, m_10ms_timer).configure_periodic(FUNC(hp98x6_upi_device::ten_ms), clocks_to_attotime(CLOCKS_PER_10MS));
 	TIMER(config, m_delay_timer).configure_generic(FUNC(hp98x6_upi_device::delay));
@@ -456,8 +438,8 @@ void hp98x6_upi_device::device_reset()
 	m_ram[RAM_POS_0_R7_KEY_DOWN] = SCANCODE_NONE;
 	// Assume RESET key is down
 	m_ram[RAM_POS_RST_DEB_CNT] = R2_FLAGS1_DEB_INIT;
-	// PROM is present
-	m_ram[RAM_POS_CFG_JUMPERS] = BIT_MASK<uint8_t>(CFG_JUMPERS_PROM_BIT);
+	// PROM is present if m_idprom != nullptr
+	m_ram[RAM_POS_CFG_JUMPERS] = bool(m_idprom) ? BIT_MASK<uint8_t>(CFG_JUMPERS_PROM_BIT) : 0;
 	// Assume US English
 	m_ram[RAM_POS_LNG_JUMPERS] = 0;
 	m_ram[RAM_POS_1_R3_TIMER_STS] = 0;
@@ -623,7 +605,7 @@ void hp98x6_upi_device::decode_cmd(uint8_t cmd)
 		// Read from ID PROM when enabled
 		if (m_ram[RAM_POS_READING_PROM] &&
 			m_ram[RAM_POS_1_R6_R_PTR] == RAM_POS_0_R1) {
-			m_ram[RAM_POS_0_R1] = id_prom[m_ram[RAM_POS_PROM_ADDR]];
+			m_ram[RAM_POS_0_R1] = m_idprom[m_ram[RAM_POS_PROM_ADDR]];
 			LOG("PROM @%02x=%02x\n", m_ram[RAM_POS_PROM_ADDR], m_ram[RAM_POS_0_R1]);
 			m_ram[RAM_POS_PROM_ADDR]++;
 		}
@@ -659,9 +641,13 @@ void hp98x6_upi_device::decode_cmd(uint8_t cmd)
 		case CMD_RD_PROM_START:
 			// 1100'0001
 			// Start reading ID PROM
-			LOG("Start PROM read\n");
-			m_ram[RAM_POS_READING_PROM] = 1;
-			m_ram[RAM_POS_PROM_ADDR] = 0;
+			if (bool(m_idprom)) {
+				LOG("Start PROM read\n");
+				m_ram[RAM_POS_READING_PROM] = 1;
+				m_ram[RAM_POS_PROM_ADDR] = 0;
+			} else {
+				LOG("Attempt to read from non-existing PROM\n");
+			}
 			break;
 		case CMD_RD_PROM_STOP:
 			// 1100'0000
@@ -951,7 +937,7 @@ void hp98x6_upi_device::acquire_keys(ioport_value input[4])
 		input[i] = m_keys[i]->read();
 		auto w = input[i];
 		while (w) {
-			auto mask = BIT_MASK<ioport_value>(31 - count_leading_zeros_32(w));
+			auto mask = BIT_MASK<ioport_value>(std::bit_width(w) - 1);
 			auto len = m_keys[i]->field(mask)->seq().length();
 			if (len > max_len) {
 				max_len = len;
@@ -965,7 +951,7 @@ void hp98x6_upi_device::acquire_keys(ioport_value input[4])
 		for (unsigned i = 0; i < 4; i++) {
 			auto w = input[i];
 			while (w) {
-				auto mask = BIT_MASK<ioport_value>(31 - count_leading_zeros_32(w));
+				auto mask = BIT_MASK<ioport_value>(std::bit_width(w) - 1);
 				auto len = m_keys[i]->field(mask)->seq().length();
 				if (len < max_len) {
 					input[i] &= ~mask;

@@ -16,8 +16,10 @@
    - pocketrc locks up if you try to exit testmode (note: it is not related to
      unimplemented C76 internal watchdog timer or software reset)
      Update: now it always locks up in test mode, regression?
+
+  Notes:
    - pocketrc long samples and drum loops go out of sync, it sounds better when
-     the C352 is underclocked to match the one in namcos22. It's possibly a BTANB,
+     the C352 is underclocked to match the one in namcos22. It's a BTANB, however,
      since current C352 frequency is the same as Tekken/Tekken 2 real PCB.
 
 Known Dumps
@@ -503,11 +505,11 @@ private:
 	TIMER_DEVICE_CALLBACK_MEMBER(mcu_irq0_cb);
 	TIMER_DEVICE_CALLBACK_MEMBER(mcu_irq2_cb);
 
-	void c76_map(address_map &map);
-	void namcos11_map(address_map &map);
-	void ptblank2ua_map(address_map &map);
-	void rom8_64_map(address_map &map);
-	void rom8_map(address_map &map);
+	void c76_map(address_map &map) ATTR_COLD;
+	void namcos11_map(address_map &map) ATTR_COLD;
+	void ptblank2ua_map(address_map &map) ATTR_COLD;
+	void rom8_64_map(address_map &map) ATTR_COLD;
+	void rom8_map(address_map &map) ATTR_COLD;
 
 	virtual void driver_start() override;
 
@@ -707,9 +709,6 @@ void namcos11_state::c76_speedup_w(offs_t offset, uint16_t data, uint16_t mem_ma
 
 void namcos11_state::driver_start()
 {
-	m_led.resolve();
-	m_recoil.resolve();
-
 	// C76 idle skipping, large speedboost
 	if (C76_SPEEDUP)
 	{
@@ -775,16 +774,15 @@ void namcos11_state::coh110(machine_config &config)
 
 	SCREEN(config, "screen", SCREEN_TYPE_RASTER);
 
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
 	c352_device &c352(C352(config, "c352", 25401600, 288));
-	c352.add_route(0, "lspeaker", 1.00);
-	c352.add_route(1, "rspeaker", 1.00);
-	//c352.add_route(2, "lspeaker", 1.00); // Second DAC not present.
-	//c352.add_route(3, "rspeaker", 1.00);
+	c352.add_route(0, "speaker", 1.00, 0);
+	c352.add_route(1, "speaker", 1.00, 1);
+	//c352.add_route(2, "speaker", 1.00); // Second DAC not present.
+	//c352.add_route(3, "speaker", 1.00);
 
-	AT28C16(config, "at28c16", 0);
+	AT28C16(config, "at28c16");
 }
 
 void namcos11_state::coh100(machine_config &config)
@@ -802,90 +800,90 @@ void namcos11_state::tekken(machine_config &config)
 	coh100(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
 	// TODO: either allow optional devices in memory maps, add another memory map without keycus or add a dummy keycus for tekken
-	KEYCUS_C406(config, "keycus", 0);
+	KEYCUS_C406(config, "keycus");
 }
 
 void namcos11_state::tekken2o(machine_config &config)
 {
 	coh100(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C406(config, "keycus", 0);
+	KEYCUS_C406(config, "keycus");
 }
 
 void namcos11_state::tekken2(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C406(config, "keycus", 0);
+	KEYCUS_C406(config, "keycus");
 }
 
 void namcos11_state::souledge(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C409(config, "keycus", 0);
+	KEYCUS_C409(config, "keycus");
 }
 
 void namcos11_state::dunkmnia(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C410(config, "keycus", 0);
+	KEYCUS_C410(config, "keycus");
 }
 
 void namcos11_state::primglex(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C411(config, "keycus", 0);
+	KEYCUS_C411(config, "keycus");
 }
 
 void namcos11_state::xevi3dg(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C430(config, "keycus", 0);
+	KEYCUS_C430(config, "keycus");
 }
 
 void namcos11_state::danceyes(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C431(config, "keycus", 0);
+	KEYCUS_C431(config, "keycus");
 }
 
 void namcos11_state::pocketrc(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C432(config, "keycus", 0);
+	KEYCUS_C432(config, "keycus");
 }
 
 void namcos11_state::fambowl(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_map);
-	KEYCUS_C432(config, "keycus", 0);   // no keycus is actually present, but the driver isn't ready for that
+	KEYCUS_C432(config, "keycus");   // no keycus is actually present, but the driver isn't ready for that
 }
 
 void namcos11_state::starswep(machine_config &config)
 {
 	coh110(config);
-	KEYCUS_C442(config, "keycus", 0);
+	KEYCUS_C442(config, "keycus");
 }
 
 void namcos11_state::myangel3(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::rom8_64_map);
-	KEYCUS_C443(config, "keycus", 0);
+	KEYCUS_C443(config, "keycus");
 }
 
 void namcos11_state::ptblank2ua(machine_config &config)
 {
 	coh110(config);
 	m_maincpu->set_addrmap(AS_PROGRAM, &namcos11_state::ptblank2ua_map);
-	KEYCUS_C443(config, "keycus", 0);
+	KEYCUS_C443(config, "keycus");
 }
 
 static INPUT_PORTS_START( namcos11 )

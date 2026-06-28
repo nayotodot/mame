@@ -38,16 +38,16 @@ public:
 		, m_bank3(*this, "bank3")
 		, m_floppy_timer(*this, "floppy_timer")
 		, m_leds(*this, "led%c", unsigned('A'))
-		{}
+	{ }
 
 	void init_kaypro();
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
 //private:
-	void kaypro_map(address_map &map);
+	void kaypro_map(address_map &map) ATTR_COLD;
 
 	void write_centronics_busy(int state);
 	TIMER_DEVICE_CALLBACK_MEMBER(floppy_timer);
@@ -98,10 +98,10 @@ public:
 	void kayproii(machine_config &config);
 
 protected:
-	virtual void machine_start() override;
+	virtual void machine_start() override ATTR_COLD;
 
 private:
-	void kayproii_io(address_map &map);
+	void kayproii_io(address_map &map) ATTR_COLD;
 
 	u8 pio_system_r();
 	void kayproii_pio_system_w(u8 data);
@@ -132,11 +132,11 @@ public:
 	void kaypro1(machine_config &config);
 
 protected:
-	virtual void machine_start() override;
+	virtual void machine_start() override ATTR_COLD;
 
 private:
-	void kaypro10_io(address_map &map);
-	void kaypro484_io(address_map &map);
+	void kaypro10_io(address_map &map) ATTR_COLD;
+	void kaypro484_io(address_map &map) ATTR_COLD;
 
 	u8 kaypro484_87_r();
 	u8 kaypro484_system_port_r();

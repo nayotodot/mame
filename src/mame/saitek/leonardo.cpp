@@ -51,11 +51,12 @@ Known expansion modules:
 - Brute Force (H8, Frans Morsch)
 - Sparc (SPARClite, Spracklen's)
 
-The H8 Brute Force module doesn't work with the 1st program version of Leonardo,
-this is mentioned in the repair manual and it says it requires an EPROM upgrade.
-The Sparc module doesn't appear to work with it either. Moreover, the Sparc module
-manual mentions that for it to work properly on Leonardo, the chesscomputer needs
-to be upgraded with an EMI PCB (power supply related, meaningless for emulation).
+The H8 Brute Force module doesn't work with the 1st program version of Leonardo
+(setting skill level doesn't work), this is mentioned in the repair manual and
+it says it requires an EPROM upgrade. The Sparc module doesn't appear to work with
+it either. Moreover, the Sparc module manual mentions that for it to work properly
+on Leonardo, the chesscomputer needs to be upgraded with an EMI PCB (power supply
+related, meaningless for emulation).
 
 *******************************************************************************/
 
@@ -67,7 +68,7 @@ to be upgraded with an EMI PCB (power supply related, meaningless for emulation)
 #include "machine/input_merger.h"
 #include "machine/nvram.h"
 #include "machine/sensorboard.h"
-#include "sound/spkrdev.h"
+#include "sound/dac.h"
 #include "video/pwm.h"
 
 #include "speaker.h"
@@ -101,8 +102,8 @@ public:
 	void galileo(machine_config &config);
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
 private:
 	// devices/pointers
@@ -111,7 +112,7 @@ private:
 	required_device<input_merger_device> m_stb;
 	required_device<sensorboard_device> m_board;
 	required_device<pwm_display_device> m_display;
-	required_device<speaker_sound_device> m_dac;
+	required_device<dac_1bit_device> m_dac;
 	required_device<rs232_port_device> m_rs232;
 	required_ioport_array<9> m_inputs;
 
@@ -120,13 +121,14 @@ private:
 	u8 m_inp_mux = 0;
 	u8 m_led_data[2] = { };
 
-	void main_map(address_map &map);
+	void main_map(address_map &map) ATTR_COLD;
 
 	void update_display();
 	void mux_w(u8 data);
 	void leds_w(u8 data);
 	u8 p1_r();
 	void p1_w(u8 data);
+	void update_ack();
 	void exp_rts_w(int state);
 
 	u8 p2_r();
@@ -185,7 +187,7 @@ void leo_state::mux_w(u8 data)
 	update_display();
 
 	// d4: speaker out
-	m_dac->level_w(BIT(data, 4));
+	m_dac->write(BIT(data, 4));
 }
 
 void leo_state::leds_w(u8 data)
@@ -206,12 +208,17 @@ void leo_state::p1_w(u8 data)
 	// ? " (toggles bit 0)
 }
 
+void leo_state::update_ack()
+{
+	if (m_rts_state != m_ack_state)
+		m_expansion->ack_w(!m_ack_state);
+}
+
 void leo_state::exp_rts_w(int state)
 {
-	// recursive NAND with ACK-P
-	if (state && m_ack_state)
-		m_expansion->ack_w(m_ack_state);
+	// SR latch to ACK-P
 	m_rts_state = state;
+	update_ack();
 }
 
 
@@ -255,11 +262,9 @@ void leo_state::p5_w(u8 data)
 	// P53: NAND with STB-P
 	m_stb->in_w<1>(BIT(data, 3));
 
-	// P55: expansion ACK-P (recursive NAND with RTS-P)
-	int ack_state = BIT(data, 5);
-	if (m_rts_state || !ack_state)
-		m_expansion->ack_w(ack_state);
-	m_ack_state = ack_state;
+	// P55: expansion ACK-P (SR latch with RTS-P)
+	m_ack_state = BIT(data, 5);
+	update_ack();
 
 	// P56,P57: chessboard led row data
 	m_led_data[0] = (m_led_data[0] & 3) | (~data >> 4 & 0xc);
@@ -351,7 +356,7 @@ static INPUT_PORTS_START( leonardo )
 	PORT_CONFSETTING(    0x04, DEF_STR( Normal ) )
 
 	PORT_START("RESET")
-	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_I) PORT_CHANGED_MEMBER(DEVICE_SELF, leo_state, go_button, 0) PORT_NAME("Go")
+	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_I) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(leo_state::go_button), 0) PORT_NAME("Go")
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( galileo ) // same buttons, but different locations
@@ -384,7 +389,7 @@ static INPUT_PORTS_START( galileo ) // same buttons, but different locations
 	PORT_BIT(0x04, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_V) PORT_NAME("Set Up")
 
 	PORT_MODIFY("RESET")
-	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_G) PORT_CHANGED_MEMBER(DEVICE_SELF, leo_state, go_button, 0) PORT_NAME("Go")
+	PORT_BIT(0x01, IP_ACTIVE_HIGH, IPT_KEYPAD) PORT_CODE(KEYCODE_G) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(leo_state::go_button), 0) PORT_NAME("Go")
 INPUT_PORTS_END
 
 
@@ -426,7 +431,7 @@ void leo_state::leonardo(machine_config &config)
 
 	// sound hardware
 	SPEAKER(config, "speaker").front_center();
-	SPEAKER_SOUND(config, m_dac).add_route(ALL_OUTPUTS, "speaker", 0.25);
+	DAC_1BIT(config, m_dac).add_route(ALL_OUTPUTS, "speaker", 0.25);
 
 	// expansion module (configure after video)
 	SAITEKOSA_EXPANSION(config, m_expansion, saitekosa_expansion_modules);

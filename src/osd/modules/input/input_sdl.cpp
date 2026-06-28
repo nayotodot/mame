@@ -15,7 +15,7 @@
 
 #include "modules/osdmodule.h"
 
-#if defined(OSD_SDL)
+#if defined(OSD_SDL) && !defined(SDLMAME_SDL3)
 
 #include "assignmenthelper.h"
 #include "input_common.h"
@@ -608,7 +608,8 @@ public:
 
 	virtual void reset() override
 	{
-		memset(&m_keyboard.state, 0, sizeof(m_keyboard.state));
+		sdl_device::reset();
+		memset(&m_keyboard, 0, sizeof(m_keyboard));
 		m_capslock_pressed = std::chrono::steady_clock::time_point::min();
 	}
 
@@ -622,7 +623,7 @@ public:
 					m_trans_table[keynum].ui_name,
 					std::string_view(),
 					itemid,
-					generic_button_get_state<s32>,
+					generic_button_get_state<u8>,
 					&m_keyboard.state[m_trans_table[keynum].sdl_scancode]);
 		}
 	}
@@ -631,9 +632,7 @@ private:
 	// state information for a keyboard
 	struct keyboard_state
 	{
-		s32 state[0x3ff];         // must be s32!
-		s8  oldkey[MAX_KEYS];
-		s8  currkey[MAX_KEYS];
+		u8  state[0x3ff];
 	};
 
 	keyboard_trans_table const &m_trans_table;
@@ -662,16 +661,19 @@ public:
 
 	virtual void reset() override
 	{
+		sdl_device::reset();
 		memset(&m_mouse, 0, sizeof(m_mouse));
 		m_v = m_h = 0;
 	}
 
 protected:
+	static constexpr unsigned MAX_BUTTONS = INPUT_MAX_BUTTONS;
+
 	// state information for a mouse
 	struct mouse_state
 	{
 		s32 lX, lY, lV, lH;
-		s32 buttons[MAX_BUTTONS];
+		u8  buttons[MAX_BUTTONS];
 	};
 
 	sdl_mouse_device_base(std::string &&name, std::string &&id, input_module &module) :
@@ -701,13 +703,13 @@ protected:
 		// add buttons
 		for (int button = 0; button < buttons; button++)
 		{
-			input_item_id itemid = (input_item_id)(ITEM_ID_BUTTON1 + button);
+			input_item_id itemid = input_item_id(ITEM_ID_BUTTON1 + button);
 			int const offset = button ^ (((1 == button) || (2 == button)) ? 3 : 0);
 			device.add_item(
 					default_button_name(button),
 					std::string_view(),
 					itemid,
-					generic_button_get_state<s32>,
+					generic_button_get_state<u8>,
 					&m_mouse.buttons[offset]);
 		}
 	}
@@ -1027,6 +1029,10 @@ private:
 class sdl_joystick_device : public sdl_joystick_device_base
 {
 public:
+	static constexpr unsigned MAX_AXES = 32;
+	static constexpr unsigned MAX_BUTTONS = 128;
+	static constexpr unsigned MAX_HATS = 8;
+
 	sdl_joystick_device(
 			std::string &&name,
 			std::string &&id,
@@ -1095,7 +1101,7 @@ public:
 					default_button_name(button),
 					std::string_view(),
 					itemid,
-					generic_button_get_state<s32>,
+					generic_button_get_state<u8>,
 					&m_joystick.buttons[button]);
 
 			// there are sixteen action button types
@@ -1138,7 +1144,7 @@ public:
 					tempname,
 					std::string_view(),
 					itemid,
-					generic_button_get_state<s32>,
+					generic_button_get_state<u8>,
 					&m_joystick.hatsU[hat]);
 
 			snprintf(tempname, sizeof(tempname), "Hat %d Down", hat + 1);
@@ -1147,7 +1153,7 @@ public:
 					tempname,
 					std::string_view(),
 					itemid,
-					generic_button_get_state<s32>,
+					generic_button_get_state<u8>,
 					&m_joystick.hatsD[hat]);
 
 			snprintf(tempname, sizeof(tempname), "Hat %d Left", hat + 1);
@@ -1156,7 +1162,7 @@ public:
 					tempname,
 					std::string_view(),
 					itemid,
-					generic_button_get_state<s32>,
+					generic_button_get_state<u8>,
 					&m_joystick.hatsL[hat]);
 
 			snprintf(tempname, sizeof(tempname), "Hat %d Right", hat + 1);
@@ -1165,7 +1171,7 @@ public:
 					tempname,
 					std::string_view(),
 					itemid,
-					generic_button_get_state<s32>,
+					generic_button_get_state<u8>,
 					&m_joystick.hatsR[hat]);
 		}
 
@@ -1316,25 +1322,20 @@ public:
 
 	~sdl_joystick_device()
 	{
-		if (m_joydevice)
-		{
-			if (m_hapdevice)
-			{
-				SDL_HapticClose(m_hapdevice);
-				m_hapdevice = nullptr;
-			}
-			SDL_JoystickClose(m_joydevice);
-			m_joydevice = nullptr;
-		}
+		close_device();
 	}
 
 	virtual void reset() override
 	{
-		memset(&m_joystick, 0, sizeof(m_joystick));
+		sdl_joystick_device_base::reset();
+		clear_buffer();
 	}
 
 	virtual void process_event(SDL_Event const &event) override
 	{
+		if (!m_joydevice)
+			return;
+
 		switch (event.type)
 		{
 		case SDL_JOYAXISMOTION:
@@ -1370,17 +1371,8 @@ public:
 		case SDL_JOYDEVICEREMOVED:
 			osd_printf_verbose("Joystick: %s [ID %s] disconnected\n", name(), id());
 			clear_instance();
-			reset();
-			if (m_joydevice)
-			{
-				if (m_hapdevice)
-				{
-					SDL_HapticClose(m_hapdevice);
-					m_hapdevice = nullptr;
-				}
-				SDL_JoystickClose(m_joydevice);
-				m_joydevice = nullptr;
-			}
+			clear_buffer();
+			close_device();
 			break;
 		}
 	}
@@ -1407,9 +1399,9 @@ protected:
 	struct sdl_joystick_state
 	{
 		s32 axes[MAX_AXES];
-		s32 buttons[MAX_BUTTONS];
-		s32 hatsU[MAX_HATS], hatsD[MAX_HATS], hatsL[MAX_HATS], hatsR[MAX_HATS];
 		s32 balls[MAX_AXES];
+		u8  buttons[MAX_BUTTONS];
+		u8  hatsU[MAX_HATS], hatsD[MAX_HATS], hatsL[MAX_HATS], hatsR[MAX_HATS];
 	};
 
 	sdl_joystick_state m_joystick;
@@ -1417,6 +1409,25 @@ protected:
 private:
 	SDL_Joystick *m_joydevice;
 	SDL_Haptic *m_hapdevice;
+
+	void clear_buffer()
+	{
+		memset(&m_joystick, 0, sizeof(m_joystick));
+	}
+
+	void close_device()
+	{
+		if (m_joydevice)
+		{
+			if (m_hapdevice)
+			{
+				SDL_HapticClose(m_hapdevice);
+				m_hapdevice = nullptr;
+			}
+			SDL_JoystickClose(m_joydevice);
+			m_joydevice = nullptr;
+		}
+	}
 };
 
 
@@ -1483,11 +1494,7 @@ public:
 
 	~sdl_game_controller_device()
 	{
-		if (m_ctrldevice)
-		{
-			SDL_GameControllerClose(m_ctrldevice);
-			m_ctrldevice = nullptr;
-		}
+		close_device();
 	}
 
 	virtual void configure(input_device &device) override
@@ -1667,7 +1674,7 @@ public:
 							buttonnames[button],
 							std::string_view(),
 							button_item++,
-							generic_button_get_state<s32>,
+							generic_button_get_state<u8>,
 							&m_controller.buttons[button]);
 					if (field && (std::size(numberedbuttons) > buttoncount))
 						std::get<1>(numberedbuttons[buttoncount]) = button;
@@ -1744,7 +1751,7 @@ public:
 						buttonnames[button],
 						std::string_view(),
 						item,
-						generic_button_get_state<s32>,
+						generic_button_get_state<u8>,
 						&m_controller.buttons[button]);
 			}
 		}
@@ -1919,8 +1926,7 @@ public:
 		{
 			// took lower paddles
 		}
-		else
-		if (consume_trigger_pair(assignments, IPT_UI_PAGE_UP, IPT_UI_PAGE_DOWN, axisitems[SDL_CONTROLLER_AXIS_TRIGGERLEFT].first, axisitems[SDL_CONTROLLER_AXIS_TRIGGERRIGHT].first))
+		else if (consume_trigger_pair(assignments, IPT_UI_PAGE_UP, IPT_UI_PAGE_DOWN, axisitems[SDL_CONTROLLER_AXIS_TRIGGERLEFT].first, axisitems[SDL_CONTROLLER_AXIS_TRIGGERRIGHT].first))
 		{
 			// took analog triggers
 		}
@@ -2048,11 +2054,15 @@ public:
 
 	virtual void reset() override
 	{
-		memset(&m_controller, 0, sizeof(m_controller));
+		sdl_joystick_device_base::reset();
+		clear_buffer();
 	}
 
 	virtual void process_event(SDL_Event const &event) override
 	{
+		if (!m_ctrldevice)
+			return;
+
 		switch (event.type)
 		{
 		case SDL_CONTROLLERAXISMOTION:
@@ -2079,12 +2089,8 @@ public:
 		case SDL_CONTROLLERDEVICEREMOVED:
 			osd_printf_verbose("Game Controller: %s [ID %s] disconnected\n", name(), id());
 			clear_instance();
-			reset();
-			if (m_ctrldevice)
-			{
-				SDL_GameControllerClose(m_ctrldevice);
-				m_ctrldevice = nullptr;
-			}
+			clear_buffer();
+			close_device();
 			break;
 		}
 	}
@@ -2105,11 +2111,25 @@ private:
 	struct sdl_controller_state
 	{
 		s32 axes[SDL_CONTROLLER_AXIS_MAX];
-		s32 buttons[SDL_CONTROLLER_BUTTON_MAX];
+		u8  buttons[SDL_CONTROLLER_BUTTON_MAX];
 	};
 
 	sdl_controller_state m_controller;
 	SDL_GameController *m_ctrldevice;
+
+	void clear_buffer()
+	{
+		memset(&m_controller, 0, sizeof(m_controller));
+	}
+
+	void close_device()
+	{
+		if (m_ctrldevice)
+		{
+			SDL_GameControllerClose(m_ctrldevice);
+			m_ctrldevice = nullptr;
+		}
+	}
 };
 
 
@@ -2141,7 +2161,7 @@ protected:
 	{
 		// dispatch event to every device by default
 		this->devicelist().for_each_device(
-				[&event] (auto &device) { device.queue_events(&event, 1); });
+				[&event] (auto &device) { device.queue_event(event); });
 	}
 };
 
@@ -2464,8 +2484,8 @@ protected:
 				SDL_JoystickNumButtons(joy),
 				SDL_JoystickNumHats(joy),
 				SDL_JoystickNumBalls(joy));
-		if (SDL_JoystickNumButtons(joy) > MAX_BUTTONS)
-			osd_printf_verbose("Joystick:   ...  Has %d buttons which exceeds supported %d buttons\n", SDL_JoystickNumButtons(joy), MAX_BUTTONS);
+		if (SDL_JoystickNumButtons(joy) > sdl_joystick_device::MAX_BUTTONS)
+			osd_printf_verbose("Joystick:   ...  Has %d buttons which exceeds supported %d buttons\n", SDL_JoystickNumButtons(joy), sdl_joystick_device::MAX_BUTTONS);
 
 		// instantiate device
 		sdl_joystick_device &devinfo = sixaxis
@@ -2487,7 +2507,7 @@ protected:
 
 		// if we find a matching joystick, dispatch the event to the joystick
 		if (target_device)
-			target_device->queue_events(&event, 1);
+			target_device->queue_event(event);
 	}
 
 	device_info *find_reconnect_match(SDL_JoystickGUID const &guid, char const *serial)
@@ -2855,9 +2875,10 @@ MODULE_NOT_SUPPORTED(sdl_game_controller_module, OSD_JOYSTICKINPUT_PROVIDER, "sd
 
 #endif // defined(SDLMAME_SDL2)
 
-
+#ifdef SDLMAME_SDL2
 MODULE_DEFINITION(KEYBOARDINPUT_SDL, osd::sdl_keyboard_module)
 MODULE_DEFINITION(MOUSEINPUT_SDL, osd::sdl_mouse_module)
 MODULE_DEFINITION(LIGHTGUNINPUT_SDL, osd::sdl_lightgun_module)
 MODULE_DEFINITION(JOYSTICKINPUT_SDLJOY, osd::sdl_joystick_module)
 MODULE_DEFINITION(JOYSTICKINPUT_SDLGAME, osd::sdl_game_controller_module)
+#endif

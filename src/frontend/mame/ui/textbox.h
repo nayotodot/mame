@@ -28,7 +28,7 @@ public:
 	virtual ~menu_textbox() override;
 
 protected:
-	menu_textbox(mame_ui_manager &mui, render_container &container);
+	menu_textbox(mame_ui_manager &mui, render_target &target);
 
 	void reset_layout();
 
@@ -77,14 +77,14 @@ class menu_fixed_textbox : public menu_textbox
 public:
 	menu_fixed_textbox(
 			mame_ui_manager &mui,
-			render_container &container,
+			render_target &target,
 			std::string &&headig,
 			std::string &&content);
 	virtual ~menu_fixed_textbox() override;
 
 protected:
 	virtual void recompute_metrics(uint32_t width, uint32_t height, float aspect) override;
-	virtual void custom_render(uint32_t flags, void *selectedref, float top, float bottom, float x, float y, float x2, float y2) override;
+	virtual void custom_render(uint32_t flags, void *selectedref, float top, float bottom, float origx1, float origy1, float origx2, float origy2) override;
 
 	virtual void populate_text(std::optional<text_layout> &layout, float &width, int &lines) override;
 

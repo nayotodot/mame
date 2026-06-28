@@ -43,8 +43,8 @@ public:
 	void act5a(machine_config &config);
 
 private:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
 	TIMER_CALLBACK_MEMBER(baud_clock);
 
@@ -63,10 +63,10 @@ private:
 	void port00_w(u8 data);
 	u8 port01_r();
 
-	void f8_mem(address_map &map);
-	void f8_io(address_map &map);
+	void f8_mem(address_map &map) ATTR_COLD;
+	void f8_io(address_map &map) ATTR_COLD;
 
-	required_device<cpu_device> m_maincpu;
+	required_device<f8_cpu_device> m_maincpu;
 	required_device<ay51013_device> m_uart;
 	required_device<rs232_port_device> m_io;
 	//required_device<rs232_port_device> m_aux;
@@ -448,7 +448,7 @@ static INPUT_PORTS_START(act5a)
 	PORT_BIT(0x08, IP_ACTIVE_LOW, IPT_KEYBOARD) PORT_NAME("Caps Lock") PORT_CHAR(UCHAR_MAMEKEY(CAPSLOCK)) PORT_CODE(KEYCODE_CAPSLOCK) PORT_TOGGLE
 
 	PORT_START("SPECIAL")
-	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_KEYBOARD) PORT_NAME("Break") PORT_CODE(KEYCODE_F9) PORT_WRITE_LINE_DEVICE_MEMBER("txd", input_merger_device, in_w<1>)
+	PORT_BIT(0x01, IP_ACTIVE_LOW, IPT_KEYBOARD) PORT_NAME("Break") PORT_CODE(KEYCODE_F9) PORT_WRITE_LINE_DEVICE_MEMBER("txd", FUNC(input_merger_device::in_w<1>))
 	PORT_BIT(0x02, IP_ACTIVE_LOW, IPT_KEYBOARD) PORT_NAME("Line/Loc") PORT_CODE(KEYCODE_F10) PORT_TOGGLE
 
 	PORT_START("DSW1")
@@ -527,12 +527,12 @@ INPUT_PORTS_END
 
 void microterm_f8_state::act5a(machine_config &config)
 {
-	cpu_device &maincpu(F8(config, "maincpu", 2_MHz_XTAL));
+	f8_cpu_device &maincpu(F8(config, "maincpu", 2_MHz_XTAL));
 	maincpu.set_addrmap(AS_PROGRAM, &microterm_f8_state::f8_mem);
 	maincpu.set_addrmap(AS_IO, &microterm_f8_state::f8_io);
-	maincpu.set_irq_acknowledge_callback("smi", FUNC(f3853_device::int_acknowledge));
 
 	f3853_device &smi(F3853(config, "smi", 2_MHz_XTAL));
+	maincpu.int_cycle_callback().set(smi, FUNC(f3853_device::int_acknowledge));
 	smi.int_req_callback().set_inputline("maincpu", F8_INPUT_LINE_INT_REQ);
 
 	AY51013(config, m_uart);

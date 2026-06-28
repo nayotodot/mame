@@ -131,7 +131,7 @@ public:
 	void stadhero(machine_config &config);
 
 protected:
-	virtual void video_start() override;
+	virtual void video_start() override ATTR_COLD;
 
 private:
 	required_device<cpu_device> m_maincpu;
@@ -155,8 +155,8 @@ private:
 
 	TILE_GET_INFO_MEMBER(get_pf1_tile_info);
 	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
-	void audio_map(address_map &map);
-	void main_map(address_map &map);
+	void audio_map(address_map &map) ATTR_COLD;
+	void main_map(address_map &map) ATTR_COLD;
 };
 
 
@@ -315,7 +315,7 @@ static INPUT_PORTS_START( stadhero )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_SERVICE1 )
-	PORT_BIT( 0x80, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x80, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 INPUT_PORTS_END
 
 /******************************************************************************/
@@ -386,16 +386,16 @@ void stadhero_state::stadhero(machine_config &config)
 	GFXDECODE(config, m_gfxdecode, "palette", gfx_stadhero);
 	PALETTE(config, "palette").set_format(palette_device::xBGR_444, 1024);
 
-	DECO_BAC06(config, m_tilegen, 0);
+	DECO_BAC06(config, m_tilegen);
 	m_tilegen->set_gfx_region_wide(1, 1, 2);
 	m_tilegen->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO_MXC06(config, m_spritegen, 0, "palette", gfx_stadhero_spr);
+	DECO_MXC06(config, m_spritegen, "palette", gfx_stadhero_spr);
 
 	// sound hardware
 	SPEAKER(config, "mono").front_center();
 
-	GENERIC_LATCH_8(config, m_soundlatch, 0);
+	GENERIC_LATCH_8(config, m_soundlatch);
 	m_soundlatch->data_pending_callback().set_inputline(m_audiocpu, INPUT_LINE_NMI);
 
 	ym2203_device &ym1(YM2203(config, "ym1", 24_MHz_XTAL / 16));

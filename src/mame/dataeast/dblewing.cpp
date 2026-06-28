@@ -129,10 +129,10 @@ private:
 	uint16_t ioprot_r(offs_t offset);
 	void ioprot_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
 
-	void dblewing_map(address_map &map);
-	void decrypted_opcodes_map(address_map &map);
-	void sound_io(address_map &map);
-	void sound_map(address_map &map);
+	void dblewing_map(address_map &map) ATTR_COLD;
+	void decrypted_opcodes_map(address_map &map) ATTR_COLD;
+	void sound_io(address_map &map) ATTR_COLD;
+	void sound_map(address_map &map) ATTR_COLD;
 	bool m_soundlatch_pending;
 };
 
@@ -279,7 +279,7 @@ static INPUT_PORTS_START( dblewing )
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
-	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 
 	PORT_START("DSW")
 		/* 16bit - These values are for Dip Switch #1 */
@@ -369,7 +369,7 @@ void dblewing_state::dblewing(machine_config &config)
 	PALETTE(config, "palette").set_format(palette_device::xBGR_444, 2048/2);
 	GFXDECODE(config, "gfxdecode", "palette", gfx_dblewing);
 
-	DECO16IC(config, m_deco_tilegen, 0);
+	DECO16IC(config, m_deco_tilegen);
 	m_deco_tilegen->set_pf1_size(DECO_64x32);
 	m_deco_tilegen->set_pf2_size(DECO_64x32);
 	m_deco_tilegen->set_pf1_col_bank(0x00);
@@ -382,10 +382,10 @@ void dblewing_state::dblewing(machine_config &config)
 	m_deco_tilegen->set_pf12_16x16_bank(1);
 	m_deco_tilegen->set_gfxdecode_tag("gfxdecode");
 
-	DECO_SPRITE(config, m_sprgen, 0, "palette", gfx_dblewing_spr);
+	DECO_SPRITE(config, m_sprgen, "palette", gfx_dblewing_spr);
 	m_sprgen->set_pri_callback(FUNC(dblewing_state::pri_callback));
 
-	DECO104PROT(config, m_deco104, 0);
+	DECO104PROT(config, m_deco104);
 	m_deco104->port_a_cb().set_ioport("INPUTS");
 	m_deco104->port_b_cb().set_ioport("SYSTEM");
 	m_deco104->port_c_cb().set_ioport("DSW");

@@ -12,7 +12,7 @@ typedef device_delegate<void (void)> igs025_execute_external;
 class igs025_device : public device_t
 {
 public:
-	igs025_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	igs025_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
 
 	uint16_t killbld_igs025_prot_r(offs_t offset);
 	// use setters instead of making public?
@@ -28,8 +28,8 @@ public:
 
 
 protected:
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	igs025_execute_external m_execute_external;
 

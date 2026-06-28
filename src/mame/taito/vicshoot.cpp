@@ -43,8 +43,8 @@ public:
 private:
 	required_device<cpu_device> m_maincpu;
 
-	void main_map(address_map &map);
-	void sound_map(address_map &map);
+	void main_map(address_map &map) ATTR_COLD;
+	void sound_map(address_map &map) ATTR_COLD;
 };
 
 
@@ -127,7 +127,7 @@ void vicshoot_state::vicshoot(machine_config &config)
 	// sound hardware
 	SPEAKER(config, "mono").front_center();
 
-	pc060ha_device &ciu(PC060HA(config, "ciu", 0));
+	pc060ha_device &ciu(PC060HA(config, "ciu"));
 	ciu.nmi_callback().set_inputline("audiocpu", INPUT_LINE_NMI);
 	ciu.reset_callback().set_inputline("audiocpu", INPUT_LINE_RESET);
 

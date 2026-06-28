@@ -122,8 +122,7 @@ public:
 	void init_mt_slot();
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_reset() override ATTR_COLD;
 
 private:
 	void megatech(machine_config &config);
@@ -161,8 +160,8 @@ private:
 	uint32_t screen_update_menu(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 	void screen_vblank_main(int state);
 
-	void megatech_bios_map(address_map &map);
-	void megatech_bios_portmap(address_map &map);
+	void megatech_bios_map(address_map &map) ATTR_COLD;
+	void megatech_bios_portmap(address_map &map) ATTR_COLD;
 
 	uint8_t m_mt_cart_select_reg = 0;
 	uint32_t m_bios_port_ctrl = 0;
@@ -651,14 +650,6 @@ void mtech_state::screen_vblank_main(int state)
 		screen_vblank_megadriv(state);
 }
 
-void mtech_state::machine_start()
-{
-	md_ctrl_state::machine_start();
-
-	m_alarm_sound.resolve();
-	m_flash_screen.resolve();
-}
-
 void mtech_state::machine_reset()
 {
 	m_mt_bank_addr = 0;
@@ -745,8 +736,8 @@ void mtech_state::megatech(machine_config &config)
 	m_vdp1->set_screen("menu");
 	m_vdp1->set_is_pal(false);
 	m_vdp1->n_int().set_inputline(m_bioscpu, 0);
-	m_vdp1->add_route(ALL_OUTPUTS, "lspeaker", 0.25);
-	m_vdp1->add_route(ALL_OUTPUTS, "rspeaker", 0.25);
+	m_vdp1->add_route(ALL_OUTPUTS, "speaker", 0.25);
+	m_vdp1->add_route(ALL_OUTPUTS, "speaker", 0.25);
 }
 
 

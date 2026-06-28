@@ -27,25 +27,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
-
-
-//============================================================
-//  PARAMETERS
-//============================================================
-
-enum
-{
-	POVDIR_LEFT = 0,
-	POVDIR_RIGHT,
-	POVDIR_UP,
-	POVDIR_DOWN
-};
-
-#define MAX_KEYS            256
-#define MAX_AXES            32
-#define MAX_BUTTONS         32
-#define MAX_HATS            8
-#define MAX_POV             4
+#include <span>
 
 
 //============================================================
@@ -91,7 +73,7 @@ template <class TEvent>
 class event_based_device : public device_info
 {
 private:
-	static inline constexpr unsigned DEFAULT_EVENT_QUEUE_SIZE = 20;
+	static inline constexpr unsigned DEFAULT_EVENT_QUEUE_SIZE = 64;
 
 	std::queue<TEvent> m_event_queue;
 
@@ -106,18 +88,23 @@ public:
 	{
 	}
 
-	void queue_events(TEvent const *events, int count)
+	void queue_event(TEvent const &event)
+	{
+		queue_events(std::span<TEvent const>(&event, 1));
+	}
+
+	void queue_events(std::span<TEvent const> events)
 	{
 		std::lock_guard<std::mutex> scope_lock(m_device_lock);
-		for (int i = 0; i < count; i++)
-			m_event_queue.push(events[i]);
+		for (TEvent const &event : events)
+			m_event_queue.push(event);
 
 		// If we've gone over the size, remove old events from the queue
 		while (m_event_queue.size() > DEFAULT_EVENT_QUEUE_SIZE)
 			m_event_queue.pop();
 	}
 
-	void virtual poll(bool relative_reset) override
+	virtual void poll(bool relative_reset) override
 	{
 		std::lock_guard<std::mutex> scope_lock(m_device_lock);
 
@@ -127,6 +114,12 @@ public:
 			process_event(m_event_queue.front());
 			m_event_queue.pop();
 		}
+	}
+
+	virtual void reset() override
+	{
+		std::lock_guard<std::mutex> scope_lock(m_device_lock);
+		std::queue<TEvent>().swap(m_event_queue);
 	}
 };
 

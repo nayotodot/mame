@@ -10,6 +10,12 @@
 
 #include "z80.inc"
 
+#define LOG_INT   (1U << 1) // z80.lst
+
+//#define VERBOSE (LOG_INT)
+#include "logmacro.h"
+
+
 DEFINE_DEVICE_TYPE(Z80N, z80n_device, "z80n", "Z80N")
 
 std::unique_ptr<util::disasm_interface> z80n_device::create_disassembler()
@@ -25,19 +31,28 @@ z80n_device::z80n_device(const machine_config &mconfig, const char *tag, device_
 {
 }
 
-void z80n_device::do_op()
+void z80n_device::execute_run()
 {
 	#include "cpu/z80/z80n.hxx"
+}
+
+void z80n_device::nmi_stackless_w(bool data)
+{
+	if (!data)
+		m_stackless_retn_en = false;
+	m_stackless = data;
 }
 
 void z80n_device::device_start()
 {
 	z80_device::device_start();
 	save_item(NAME(m_stackless));
+	save_item(NAME(m_stackless_retn_en));
 }
 
 void z80n_device::device_reset()
 {
 	z80_device::device_reset();
-	m_stackless = 0;
+	m_stackless = false;
+	m_stackless_retn_en = false;
 }

@@ -1,7 +1,7 @@
 // license:BSD-3-Clause
 // copyright-holders:Bryan McPhail, David Haywood
-#ifndef MAME_DATAEAST_DECOBAC06_H
-#define MAME_DATAEAST_DECOBAC06_H
+#ifndef MAME_DATAEAST_DECBAC06_H
+#define MAME_DATAEAST_DECBAC06_H
 
 #pragma once
 
@@ -17,7 +17,7 @@ typedef device_delegate<void (tile_data &tileinfo, u32 &tile, u32 &colour, u32 &
 class deco_bac06_device : public device_t
 {
 public:
-	deco_bac06_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock);
+	deco_bac06_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
 
 	// configuration
 	template <typename T> void set_gfxdecode_tag(T &&tag) { m_gfxdecode.set_tag(std::forward<T>(tag)); }
@@ -113,8 +113,8 @@ public:
 	bool m_flip_screen = false;
 
 protected:
-	virtual void device_start() override;
-	virtual void device_reset() override;
+	virtual void device_start() override ATTR_COLD;
+	virtual void device_reset() override ATTR_COLD;
 
 	u8 m_gfxregion8x8;
 	u8 m_gfxregion16x16;
@@ -148,4 +148,4 @@ private:
 
 DECLARE_DEVICE_TYPE(DECO_BAC06, deco_bac06_device)
 
-#endif // MAME_DATAEAST_DECOBAC06_H
+#endif // MAME_DATAEAST_DECBAC06_H

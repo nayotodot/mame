@@ -134,7 +134,7 @@ public:
 	void init_sshangha();
 
 protected:
-	virtual void video_start() override;
+	virtual void video_start() override ATTR_COLD;
 
 private:
 	required_device<cpu_device> m_maincpu;
@@ -172,9 +172,9 @@ private:
 
 	uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 
-	void sshangha_main_map(address_map &map);
-	void sound_map(address_map &map);
-	void sshanghab_main_map(address_map &map);
+	void sshangha_main_map(address_map &map) ATTR_COLD;
+	void sound_map(address_map &map) ATTR_COLD;
+	void sshanghab_main_map(address_map &map) ATTR_COLD;
 };
 
 
@@ -417,7 +417,7 @@ static INPUT_PORTS_START( sshangha )
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
-	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -553,7 +553,7 @@ void sshangha_state::sshangha(machine_config &config)
 
 	PALETTE(config, m_palette).set_format(palette_device::xBGR_888, 0x4000/4);
 
-	DECO16IC(config, m_tilegen, 0);
+	DECO16IC(config, m_tilegen);
 	// requires pf1 to be 64x64 for the ending screen to be displayed properly
 	// TODO: confirm arrangement, game barely uses scrolling otherwise
 	m_tilegen->set_pf1_size(DECO_64x64);
@@ -569,10 +569,10 @@ void sshangha_state::sshangha(machine_config &config)
 	m_tilegen->set_pf12_16x16_bank(1);
 	m_tilegen->set_gfxdecode_tag("gfxdecode");
 
-	DECO_SPRITE(config, m_sprgen[0], 0, m_palette, gfx_sshangha_spr1);
-	DECO_SPRITE(config, m_sprgen[1], 0, m_palette, gfx_sshangha_spr2);
+	DECO_SPRITE(config, m_sprgen[0], m_palette, gfx_sshangha_spr1);
+	DECO_SPRITE(config, m_sprgen[1], m_palette, gfx_sshangha_spr2);
 
-	DECO146PROT(config, m_deco146, 0);
+	DECO146PROT(config, m_deco146);
 	m_deco146->port_a_cb().set_ioport(m_inputs);
 	m_deco146->port_b_cb().set_ioport(m_system);
 	m_deco146->port_c_cb().set_ioport(m_dsw);

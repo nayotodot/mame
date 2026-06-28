@@ -55,12 +55,12 @@ private:
 	void port09_w(u8 data);
 	void port10_w(u8 data);
 	u32 screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
-	void io_map(address_map &map);
-	void mem_map(address_map &map);
+	void io_map(address_map &map) ATTR_COLD;
+	void mem_map(address_map &map) ATTR_COLD;
 	u8 m_kbd_row = 0U;
 	bool m_spk_pol = false;
-	virtual void machine_reset() override;
-	virtual void machine_start() override;
+	virtual void machine_reset() override ATTR_COLD;
+	virtual void machine_start() override ATTR_COLD;
 	memory_passthrough_handler m_rom_shadow_tap;
 	required_device<cpu_device> m_maincpu;
 	required_region_ptr<u8> m_rom;
@@ -278,7 +278,7 @@ ROM_START( plan80 )
 
 	// This rom 2nd half is missing, so useless. It uses the videoram address range, so it might have been for some other system
 	//ROM_REGION( 0x10000, "spare", 0 )
-	//ROM_LOAD_OPTIONAL( "pl80mod.bin", 0xf000, 0x0800, CRC(6bdd7136) SHA1(721eab193c33c9330e0817616d3d2b601285fe50))
+	//ROM_LOAD( "pl80mod.bin", 0xf000, 0x0800, CRC(6bdd7136) SHA1(721eab193c33c9330e0817616d3d2b601285fe50))
 
 	ROM_REGION( 0x0800, "chargen", 0 )
 	ROM_LOAD( "pl80gzn.bin", 0x0000, 0x0800, CRC(b4ddbdb6) SHA1(31bf9cf0f2ed53f48dda29ea830f74cea7b9b9b2) )

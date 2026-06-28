@@ -88,16 +88,16 @@ public:
 		m_led(*this, "led0")
 	{ }
 
-	void berzerk(machine_config &config);
-	void frenzy(machine_config &config);
+	void berzerk(machine_config &config) ATTR_COLD;
+	void frenzy(machine_config &config) ATTR_COLD;
 
-	void init_moonwarp();
+	void init_moonwarp() ATTR_COLD;
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 	virtual void sound_reset() override;
-	virtual void video_start() override;
+	virtual void video_start() override ATTR_COLD;
 
 private:
 	required_device<cpu_device> m_maincpu;
@@ -153,9 +153,9 @@ private:
 	void create_nmi_timer();
 	void start_nmi_timer();
 	void get_pens(rgb_t *pens);
-	void berzerk_io_map(address_map &map);
-	void berzerk_map(address_map &map);
-	void frenzy_map(address_map &map);
+	void berzerk_io_map(address_map &map) ATTR_COLD;
+	void berzerk_map(address_map &map) ATTR_COLD;
+	void frenzy_map(address_map &map) ATTR_COLD;
 };
 
 
@@ -400,8 +400,6 @@ void berzerk_state::machine_start()
 	create_irq_timer();
 	create_nmi_timer();
 
-	m_led.resolve();
-
 	/* register for state saving */
 	save_item(NAME(m_magicram_control));
 	save_item(NAME(m_last_shift_data));
@@ -607,7 +605,7 @@ void berzerk_state::audio_w(offs_t offset, uint8_t data)
 			/* clock control - the first LS161 divides the clock by 9 to 16, the 2nd by 8,
 			   giving a final clock from 19.5kHz to 34.7kHz */
 			int clock_divisor = 16 - (data & 0x07);
-			m_s14001a->set_clock(S14001_CLOCK / clock_divisor / 8);
+			m_s14001a->set_unscaled_clock(S14001_CLOCK / clock_divisor / 8);
 			break;
 		}
 
@@ -741,7 +739,7 @@ void berzerk_state::berzerk_io_map(address_map &map)
 	PORT_DIPSETTING(    0x04, DEF_STR( 1C_5C ) ) \
 	PORT_DIPSETTING(    0x05, DEF_STR( 1C_6C ) ) \
 	PORT_DIPSETTING(    0x06, DEF_STR( 1C_7C ) ) \
-	PORT_DIPSETTING(    0x07, "1 Coin/10 Credits" ) \
+	PORT_DIPSETTING(    0x07, DEF_STR( 1C_10C ) ) \
 	PORT_DIPSETTING(    0x08, "1 Coin/14 Credits" )
 
 
@@ -1192,7 +1190,7 @@ void berzerk_state::berzerk(machine_config &config)
 	m_s14001a->add_route(ALL_OUTPUTS, "s14001a_volume", 0.5);
 	FILTER_VOLUME(config, m_s14001a_volume).add_route(ALL_OUTPUTS, "mono", 1.0);
 
-	EXIDY(config, m_custom, 0).add_route(ALL_OUTPUTS, "mono", 0.33);
+	EXIDY(config, m_custom).add_route(ALL_OUTPUTS, "mono", 0.33);
 }
 
 

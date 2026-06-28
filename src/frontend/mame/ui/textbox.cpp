@@ -78,8 +78,8 @@ void populate_three_column_layout(std::string_view text, T &&l, U &&c, V &&r)
 //  menu_textbox - base text box menu class
 //-------------------------------------------------
 
-menu_textbox::menu_textbox(mame_ui_manager &mui, render_container &container)
-	: menu(mui, container)
+menu_textbox::menu_textbox(mame_ui_manager &mui, render_target &target)
+	: menu(mui, target)
 	, m_layout()
 	, m_line_bounds(0.0F, 0.0F)
 	, m_visible_top(0.0F)
@@ -418,7 +418,7 @@ void menu_textbox::draw(uint32_t flags)
 
 	highlight(m_line_bounds.first, line_y0, m_line_bounds.second, line_y1, ui().colors().selected_bg_color());
 	ui().draw_text_full(
-			container(), itemtext,
+			target(), itemtext,
 			effective_left, line_y0, draw_width,
 			text_layout::text_justify::CENTER, text_layout::word_wrapping::TRUNCATE,
 			mame_ui_manager::NORMAL,
@@ -469,10 +469,10 @@ inline bool menu_textbox::pointer_in_line(float y, int line) const
 
 menu_fixed_textbox::menu_fixed_textbox(
 		mame_ui_manager &mui,
-		render_container &container,
+		render_target &target,
 		std::string &&heading,
 		std::string &&content)
-	: menu_textbox(mui, container)
+	: menu_textbox(mui, target)
 	, m_heading(std::move(heading))
 	, m_content(std::move(content))
 {
@@ -492,12 +492,12 @@ void menu_fixed_textbox::recompute_metrics(uint32_t width, uint32_t height, floa
 }
 
 
-void menu_fixed_textbox::custom_render(uint32_t flags, void *selectedref, float top, float bottom, float x1, float y1, float x2, float y2)
+void menu_fixed_textbox::custom_render(uint32_t flags, void *selectedref, float top, float bottom, float origx1, float origy1, float origx2, float origy2)
 {
 	std::string_view const toptext[] = { m_heading };
 	draw_text_box(
 			std::begin(toptext), std::end(toptext),
-			x1, x2, y1 - top, y1 - tb_border(),
+			origx1, origx2, origy1 - top, origy1 - tb_border(),
 			text_layout::text_justify::CENTER, text_layout::word_wrapping::NEVER, false,
 			ui().colors().text_color(), UI_GREEN_COLOR);
 }

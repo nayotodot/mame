@@ -39,6 +39,39 @@ floppy_image::~floppy_image()
 {
 }
 
+void floppy_image::set_variant(uint32_t _variant)
+{
+	variant = _variant;
+
+	// Initialize hard sectors
+	index_array.clear();
+
+	uint32_t sectors;
+	switch(variant) {
+	case SSDD16:
+	case SSQD16:
+	case DSDD16:
+	case DSQD16:
+		sectors = 16;
+		break;
+	default:
+		sectors = 0;
+	}
+	if(sectors) {
+		uint32_t sector_angle = 200000000/sectors;
+		for(int i = 1; i < sectors; i++)
+			index_array.push_back(i*sector_angle);
+		index_array.push_back((sectors-1)*sector_angle + sector_angle/2);
+	}
+}
+
+void floppy_image::find_index_hole(uint32_t pos, uint32_t &last, uint32_t &next) const
+{
+	auto nexti = std::lower_bound(index_array.begin(), index_array.end(), pos+1);
+	next = nexti == index_array.end() ? 200000000 : *nexti;
+	last = nexti == index_array.begin() ? 0 : *--nexti;
+}
+
 void floppy_image::get_maximal_geometry(int &_tracks, int &_heads) const noexcept
 {
 	_tracks = tracks;
@@ -104,13 +137,30 @@ bool floppy_image::track_is_formatted(int track, int head, int subtrack) const n
 const char *floppy_image::get_variant_name(uint32_t form_factor, uint32_t variant) noexcept
 {
 	switch(variant) {
-	case SSSD: return "Single side, single density";
-	case SSDD: return "Single side, double density";
-	case SSQD: return "Single side, quad density";
-	case DSDD: return "Double side, double density";
-	case DSQD: return "Double side, quad density";
-	case DSHD: return "Double side, high density";
-	case DSED: return "Double side, extended density";
+	case SSSD:   return "Single side, single density";
+	case SSSD10: return "Single side, single density, 10-sector";
+	case SSSD16: return "Single side, single density, 16-sector";
+	case SSSD32: return "Single side, single density, 32-sector";
+	case SSDD:   return "Single side, double density";
+	case SSDD10: return "Single side, double density, 10-sector";
+	case SSDD16: return "Single side, double density, 16 hard sector";
+	case SSDD32: return "Single side, double density, 32-sector";
+	case SSQD:   return "Single side, quad density";
+	case SSQD10: return "Single side, quad density, 10-sector";
+	case SSQD16: return "Single side, quad density, 16 hard sector";
+	case DSSD:   return "Double side, single density";
+	case DSSD10: return "Double side, single density, 10-sector";
+	case DSSD16: return "Double side, single density, 16-sector";
+	case DSSD32: return "Double side, single density, 32-sector";
+	case DSDD:   return "Double side, double density";
+	case DSDD10: return "Double side, double density, 10-sector";
+	case DSDD16: return "Double side, double density, 16 hard sector";
+	case DSDD32: return "Double side, double density, 32-sector";
+	case DSQD:   return "Double side, quad density";
+	case DSQD10: return "Double side, quad density, 10-sector";
+	case DSQD16: return "Double side, quad density, 16 hard sector";
+	case DSHD:   return "Double side, high density";
+	case DSED:   return "Double side, extended density";
 	}
 	return "Unknown";
 }
@@ -128,21 +178,25 @@ bool floppy_image_format_t::save(util::random_read_write &io, const std::vector<
 	return false;
 }
 
-bool floppy_image_format_t::extension_matches(const char *file_name) const
+bool floppy_image_format_t::supports_save() const noexcept
 {
-	const char *ext = strrchr(file_name, '.');
-	if(!ext)
+	return false;
+}
+
+bool floppy_image_format_t::extension_matches(std::string_view file_name) const noexcept
+{
+	auto const sep = file_name.rfind('.');
+	if(std::string_view::npos == sep)
 		return false;
-	ext++;
-	int elen = strlen(ext);
-	const char *rext = extensions();
+	auto const ext = file_name.substr(sep + 1);
+	char const *rext = extensions();
 	for(;;) {
-		const char *next_ext = strchr(rext, ',');
-		int rlen = next_ext ? next_ext - rext : strlen(rext);
-		if(rlen == elen && !memcmp(ext, rext, rlen))
+		char const *next_ext = strchr(rext, ',');
+		int const rlen = next_ext ? (next_ext - rext) : strlen(rext);
+		if(std::string_view(rext, rlen) == ext)
 			return true;
 		if(next_ext)
-			rext = next_ext +1;
+			rext = next_ext + 1;
 		else
 			break;
 	}
@@ -1660,12 +1714,12 @@ void floppy_image_format_t::get_geometry_mfm_pc(const floppy_image &image, int c
 }
 
 
-void floppy_image_format_t::get_track_data_mfm_pc(int track, int head, const floppy_image &image, int cell_size, int sector_size, int sector_count, uint8_t *sectdata)
+void floppy_image_format_t::get_track_data_mfm_pc_sectors(int track, int head, const floppy_image &image, int cell_size, int sector_size, int start_sector, int end_sector, uint8_t *sectdata)
 {
 	auto bitstream = generate_bitstream_from_track(track, head, cell_size, image);
 	auto sectors = extract_sectors_from_bitstream_mfm_pc(bitstream);
-	for(int sector=1; sector <= sector_count; sector++) {
-		uint8_t *sd = sectdata + (sector-1)*sector_size;
+	for(int sector = start_sector; sector <= end_sector; sector++) {
+		uint8_t *sd = sectdata + (sector - start_sector) * sector_size;
 		if(sector < sectors.size() && !sectors[sector].empty()) {
 			unsigned int asize = sectors[sector].size();
 			if(asize > sector_size)
@@ -1676,6 +1730,12 @@ void floppy_image_format_t::get_track_data_mfm_pc(int track, int head, const flo
 		} else
 			memset(sd, 0, sector_size);
 	}
+}
+
+
+void floppy_image_format_t::get_track_data_mfm_pc(int track, int head, const floppy_image &image, int cell_size, int sector_size, int sector_count, uint8_t *sectdata)
+{
+	get_track_data_mfm_pc_sectors(track, head, image, cell_size, sector_size, 1, sector_count, sectdata);
 }
 
 
@@ -1855,6 +1915,8 @@ void floppy_image_format_t::build_pc_track_fm(int track, int head, floppy_image 
 		fm_w (track_data, 8, sects[i].sector);
 		fm_w (track_data, 8, sects[i].size);
 		crc = calc_crc_ccitt(track_data, cpos, track_data.size());
+		if(sects[i].bad_addr_crc)
+			crc = 0xffff^crc;
 		fm_w (track_data, 16, crc);
 		for(int j=0; j<gap_2; j++) fm_w(track_data, 8, 0xff);
 
@@ -1868,7 +1930,7 @@ void floppy_image_format_t::build_pc_track_fm(int track, int head, floppy_image 
 			raw_w(track_data, 16, sects[i].deleted ? 0xf56a : 0xf56f);
 			for(int j=0; j<sects[i].actual_size; j++) fm_w(track_data, 8, sects[i].data[j]);
 			crc = calc_crc_ccitt(track_data, cpos, track_data.size());
-			if(sects[i].bad_crc)
+			if(sects[i].bad_data_crc)
 				crc = 0xffff^crc;
 			fm_w(track_data, 16, crc);
 			if(i != sector_count-1)
@@ -1922,6 +1984,8 @@ void floppy_image_format_t::build_pc_track_mfm(int track, int head, floppy_image
 		mfm_w(track_data, 8, sects[i].sector);
 		mfm_w(track_data, 8, sects[i].size);
 		crc = calc_crc_ccitt(track_data, cpos, track_data.size());
+		if(sects[i].bad_addr_crc)
+			crc = 0xffff^crc;
 		mfm_w(track_data, 16, crc);
 		for(int j=0; j<gap_2; j++) mfm_w(track_data, 8, 0x4e);
 
@@ -1936,7 +2000,7 @@ void floppy_image_format_t::build_pc_track_mfm(int track, int head, floppy_image
 			mfm_w(track_data, 8, sects[i].deleted ? 0xf8 : 0xfb);
 			for(int j=0; j<sects[i].actual_size; j++) mfm_w(track_data, 8, sects[i].data[j]);
 			crc = calc_crc_ccitt(track_data, cpos, track_data.size());
-			if(sects[i].bad_crc)
+			if(sects[i].bad_data_crc)
 				crc = 0xffff^crc;
 			mfm_w(track_data, 16, crc);
 			if(i != sector_count-1)

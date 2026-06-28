@@ -36,15 +36,15 @@ namespace ui {
 class menu_dats_view : public menu_textbox
 {
 public:
-	menu_dats_view(mame_ui_manager &mui, render_container &container, const ui_software_info &swinfo);
-	menu_dats_view(mame_ui_manager &mui, render_container &container, const ui_system_info *system = nullptr);
+	menu_dats_view(mame_ui_manager &mui, render_target &target, const ui_software_info &swinfo);
+	menu_dats_view(mame_ui_manager &mui, render_target &target, const ui_system_info *system = nullptr);
 	virtual ~menu_dats_view() override;
 
 	static void add_info_text(text_layout &layout, std::string_view text, rgb_t color, float size = 1.0f);
 
 protected:
 	virtual void recompute_metrics(uint32_t width, uint32_t height, float aspect) override;
-	virtual void custom_render(uint32_t flags, void *selectedref, float top, float bottom, float x, float y, float x2, float y2) override;
+	virtual void custom_render(uint32_t flags, void *selectedref, float top, float bottom, float origx1, float origy1, float origx2, float origy2) override;
 	virtual std::tuple<int, bool, bool> custom_pointer_updated(bool changed, ui_event const &uievt) override;
 
 	virtual void populate_text(std::optional<text_layout> &layout, float &width, int &lines) override;

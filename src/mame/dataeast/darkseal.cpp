@@ -66,8 +66,8 @@ private:
 
 	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
 	void update_palette(int offset);
-	void main_map(address_map &map);
-	void sound_map(address_map &map);
+	void main_map(address_map &map) ATTR_COLD;
+	void sound_map(address_map &map) ATTR_COLD;
 
 	required_device<cpu_device> m_maincpu;
 	required_device<h6280_device> m_audiocpu;
@@ -226,7 +226,7 @@ static INPUT_PORTS_START( darkseal )
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_COIN3 )
-	PORT_BIT( 0x08, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x08, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -341,7 +341,7 @@ void darkseal_state::darkseal(machine_config &config)
 
 	BUFFERED_SPRITERAM16(config, m_spriteram);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x64);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x64);     // both these tilemaps need to be twice the y size of usual!
 	m_deco_tilegen[0]->set_pf1_col_bank(0x00);
@@ -352,7 +352,7 @@ void darkseal_state::darkseal(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag("gfxdecode");
 
-	DECO16IC(config, m_deco_tilegen[1], 0);
+	DECO16IC(config, m_deco_tilegen[1]);
 	m_deco_tilegen[1]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf1_col_bank(0x00);
@@ -363,7 +363,7 @@ void darkseal_state::darkseal(machine_config &config)
 	m_deco_tilegen[1]->set_pf12_16x16_bank(2);
 	m_deco_tilegen[1]->set_gfxdecode_tag("gfxdecode");
 
-	DECO_SPRITE(config, m_sprgen, 0, m_palette, gfx_darkseal_spr);
+	DECO_SPRITE(config, m_sprgen, m_palette, gfx_darkseal_spr);
 
 	// sound hardware
 	SPEAKER(config, "mono").front_center();

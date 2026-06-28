@@ -4,13 +4,16 @@
 
     Mirage Youjuu Mahjongden (c) 1994 Mitchell
 
-    Similar to simpl156.cpp with shifted stuff around.
+    Similar to simpl156.cpp with stuff shifted around.
 
     TODO:
-    - some unknown writes (irq acks / sprite DMA start presumably);
+    - some unknown writes (IRQ acks / sprite DMA start presumably);
 
     Notes:
-    - To enter into full Test Mode you need to keep pressed the Mahjong A key at start-up.
+    - To enter into full Test Mode you need to hold the Mahjong A key at start-up.
+      Chi=down, L=up, A=select, Start=select/return
+      Object Test: Ron=pgdn, N=pgup, D=table, Reach/Pon=palette, FF=objmov test
+      Back Test: A=table, Reach/Pon=palette
 
 ===============================================================================================
 
@@ -39,9 +42,12 @@ MR_01-.3A    [a0b758aa]
 ***********************************************************************************************/
 
 #include "emu.h"
+
 #include "deco16ic.h"
 #include "decocrpt.h"
 #include "decospr.h"
+
+#include "mahjong.h"
 
 #include "cpu/m68000/m68000.h"
 #include "machine/eepromser.h"
@@ -76,19 +82,19 @@ public:
 	void init_mirage();
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
 private:
-	void mjmux_w(uint16_t data);
-	uint16_t mjmux_r();
+	void key_matrix_w(uint16_t data);
+	uint16_t key_matrix_r();
 	void okim1_rombank_w(uint16_t data);
 	void okim0_rombank_w(uint16_t data);
 	DECOSPR_PRIORITY_CB_MEMBER(pri_callback);
 
-	uint32_t screen_update_mirage(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
+	uint32_t screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect);
 	DECO16IC_BANK_CB_MEMBER(bank_callback);
-	void mirage_map(address_map &map);
+	void main_map(address_map &map) ATTR_COLD;
 
 	/* devices */
 	required_device<m68000_device> m_maincpu;
@@ -105,11 +111,11 @@ private:
 	required_ioport_array<5> m_io_key;
 
 	/* misc */
-	uint8_t m_mux_data = 0;
+	uint8_t m_key_matrix_select = 0;
 
 };
 
-uint32_t miragemj_state::screen_update_mirage(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
+uint32_t miragemj_state::screen_update(screen_device &screen, bitmap_rgb32 &bitmap, const rectangle &cliprect)
 {
 	uint16_t const flip = m_deco_tilegen->pf_control_r(0);
 
@@ -128,20 +134,21 @@ uint32_t miragemj_state::screen_update_mirage(screen_device &screen, bitmap_rgb3
 }
 
 
-void miragemj_state::mjmux_w(uint16_t data)
+void miragemj_state::key_matrix_w(uint16_t data)
 {
-	m_mux_data = data & 0x1f;
+	m_key_matrix_select = data & 0x1f;
 }
 
-uint16_t miragemj_state::mjmux_r()
+uint16_t miragemj_state::key_matrix_r()
 {
-	uint16_t result = 0xffff;
+	uint8_t const select = bitswap<5>(m_key_matrix_select, 2, 4, 1, 3, 0);
+	uint16_t result = 0x3f;
 	for (int i = 0; m_io_key.size() > i; ++i)
 	{
-		if (BIT(m_mux_data, i))
+		if (BIT(select, i))
 			result &= m_io_key[i]->read();
 	}
-	return result;
+	return 0xffc0 | result;
 }
 
 void miragemj_state::okim1_rombank_w(uint16_t data)
@@ -159,7 +166,7 @@ void miragemj_state::okim0_rombank_w(uint16_t data)
 	m_oki_bgm->set_rom_bank(data & 0x7);
 }
 
-void miragemj_state::mirage_map(address_map &map)
+void miragemj_state::main_map(address_map &map)
 {
 	map(0x000000, 0x07ffff).rom();
 	/* tilemaps */
@@ -177,8 +184,8 @@ void miragemj_state::mirage_map(address_map &map)
 	map(0x16a000, 0x16a001).nopw();
 	map(0x16c000, 0x16c001).w(FUNC(miragemj_state::okim1_rombank_w));
 	map(0x16c002, 0x16c003).w(FUNC(miragemj_state::okim0_rombank_w));
-	map(0x16c004, 0x16c005).w(FUNC(miragemj_state::mjmux_w));
-	map(0x16c006, 0x16c007).r(FUNC(miragemj_state::mjmux_r));
+	map(0x16c004, 0x16c005).w(FUNC(miragemj_state::key_matrix_w));
+	map(0x16c006, 0x16c007).r(FUNC(miragemj_state::key_matrix_r));
 	map(0x16e000, 0x16e001).nopw();
 	map(0x16e002, 0x16e003).portr("SYSTEM_IN");
 	map(0x170000, 0x173fff).ram();
@@ -191,45 +198,11 @@ static INPUT_PORTS_START( mirage )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_SERVICE( 0x0008, IP_ACTIVE_LOW )
-	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
-	PORT_BIT( 0x0020, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, do_read)
+	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
+	PORT_BIT( 0x0020, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::do_read))
 	PORT_BIT( 0xffc0, IP_ACTIVE_LOW, IPT_UNKNOWN )
 
-	PORT_START("KEY0")
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_MAHJONG_A )
-	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_MAHJONG_E )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_MAHJONG_I )
-	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_MAHJONG_M )
-	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_MAHJONG_KAN )
-	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_START1 )
-	PORT_BIT( 0xffc0, IP_ACTIVE_LOW, IPT_UNUSED )
-
-	PORT_START("KEY1")
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_MAHJONG_C )
-	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_MAHJONG_G )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_MAHJONG_K )
-	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_MAHJONG_CHI )
-	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_MAHJONG_RON )
-	PORT_BIT( 0xffe0, IP_ACTIVE_LOW, IPT_UNUSED )
-
-	PORT_START("KEY2")
-	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_MAHJONG_FLIP_FLOP )
-	PORT_BIT( 0xfff7, IP_ACTIVE_LOW, IPT_UNUSED )
-
-	PORT_START("KEY3")
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_MAHJONG_B )
-	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_MAHJONG_F )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_MAHJONG_J )
-	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_MAHJONG_N )
-	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_MAHJONG_REACH )
-	PORT_BIT( 0xffe0, IP_ACTIVE_LOW, IPT_UNUSED )
-
-	PORT_START("KEY4")
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_MAHJONG_D )
-	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_MAHJONG_H )
-	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_MAHJONG_L )
-	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_MAHJONG_PON )
-	PORT_BIT( 0xfff0, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_INCLUDE( mahjong_matrix_1p_ff )
 INPUT_PORTS_END
 
 
@@ -281,19 +254,19 @@ DECO16IC_BANK_CB_MEMBER(miragemj_state::bank_callback)
 
 void miragemj_state::machine_start()
 {
-	save_item(NAME(m_mux_data));
+	save_item(NAME(m_key_matrix_select));
 }
 
 void miragemj_state::machine_reset()
 {
-	m_mux_data = 0;
+	m_key_matrix_select = 0;
 }
 
 void miragemj_state::mirage(machine_config &config)
 {
 	/* basic machine hardware */
 	M68000(config, m_maincpu, 28000000/2);
-	m_maincpu->set_addrmap(AS_PROGRAM, &miragemj_state::mirage_map);
+	m_maincpu->set_addrmap(AS_PROGRAM, &miragemj_state::main_map);
 	m_maincpu->set_vblank_int("screen", FUNC(miragemj_state::irq6_line_hold));
 
 	EEPROM_93C46_16BIT(config, "eeprom");  // 93C45
@@ -306,13 +279,13 @@ void miragemj_state::mirage(machine_config &config)
 	screen.set_vblank_time(ATTOSECONDS_IN_USEC(529));
 	screen.set_size(40*8, 32*8);
 	screen.set_visarea(0*8, 40*8-1, 1*8, 31*8-1);
-	screen.set_screen_update(FUNC(miragemj_state::screen_update_mirage));
+	screen.set_screen_update(FUNC(miragemj_state::screen_update));
 	screen.screen_vblank().set(m_spriteram, FUNC(buffered_spriteram16_device::vblank_copy_rising));
 
 	GFXDECODE(config, "gfxdecode", "palette", gfx_mirage);
 	PALETTE(config, "palette").set_format(palette_device::xBGR_555, 1024);
 
-	DECO16IC(config, m_deco_tilegen, 0);
+	DECO16IC(config, m_deco_tilegen);
 	m_deco_tilegen->set_pf1_size(DECO_64x32);
 	m_deco_tilegen->set_pf2_size(DECO_64x32);
 	m_deco_tilegen->set_pf1_col_bank(0x00);
@@ -325,7 +298,7 @@ void miragemj_state::mirage(machine_config &config)
 	m_deco_tilegen->set_pf12_16x16_bank(1);
 	m_deco_tilegen->set_gfxdecode_tag("gfxdecode");
 
-	DECO_SPRITE(config, m_sprgen, 0, "palette", gfx_mirage_spr);
+	DECO_SPRITE(config, m_sprgen, "palette", gfx_mirage_spr);
 	m_sprgen->set_pri_callback(FUNC(miragemj_state::pri_callback));
 
 	/* sound hardware */

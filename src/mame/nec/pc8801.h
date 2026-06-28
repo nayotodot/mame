@@ -13,19 +13,22 @@
 
 #include "pc8001.h"
 
+#include "pc88_sdip.h"
+
 #include "bus/centronics/ctronics.h"
 #include "bus/msx/ctrl/ctrl.h"
+#include "bus/nec_fdd/pc80s31k.h"
 #include "bus/pc8801/pc8801_31.h"
 #include "bus/pc8801/pc8801_exp.h"
 #include "cpu/z80/z80.h"
 #include "imagedev/cassette.h"
 #include "imagedev/floppy.h"
+#include "machine/bankdev.h"
 #include "machine/i8214.h"
 #include "machine/i8251.h"
 #include "machine/i8255.h"
 #include "machine/timer.h"
 #include "machine/upd1990a.h"
-#include "pc80s31k.h"
 #include "sound/beep.h"
 #include "sound/ymopn.h"
 
@@ -49,8 +52,7 @@ public:
 		, m_usart(*this, "usart")
 //      , m_cassette(*this, "cassette")
 		, m_beeper(*this, "beeper")
-		, m_lspeaker(*this, "lspeaker")
-		, m_rspeaker(*this, "rspeaker")
+		, m_speaker(*this, "speaker")
 		, m_palette(*this, "palette")
 		, m_n80rom(*this, "n80rom")
 		, m_n88rom(*this, "n88rom")
@@ -59,29 +61,29 @@ public:
 		, m_kanji_lv2_rom(*this, "kanji_lv2")
 		, m_mouse_port(*this, "mouseport") // labelled "マウス" (mouse) - can't use "mouse" because of core -mouse option
 		, m_exp(*this, "exp")
+		, m_window_view(*this, "window_view")
+		, m_gvram_bank(*this, "gvram_bank")
 	{
 	}
 
 	void pc8801(machine_config &config);
 
 protected:
-	virtual void video_start() override;
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
-
-	uint8_t mem_r(offs_t offset);
-	void mem_w(offs_t offset, uint8_t data);
+	virtual void video_start() override ATTR_COLD;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
 	virtual UPD3301_FETCH_ATTRIBUTE( attr_fetch ) override;
 
 	virtual uint8_t dma_mem_r(offs_t offset) override;
-
-	virtual uint8_t dictionary_rom_r(offs_t offset);
-	virtual bool dictionary_rom_enable();
+	void dma_mem_w(offs_t offset, u8 data);
+	uint8_t dackv(offs_t offset);
 
 	virtual uint8_t cdbios_rom_r(offs_t offset);
 	virtual bool cdbios_rom_enable();
-	virtual void main_io(address_map &map);
+	virtual void main_map(address_map &map) ATTR_COLD;
+	virtual void main_io(address_map &map) ATTR_COLD;
+	virtual void gvram_map(address_map &map) ATTR_COLD;
 
 //  required_device<cpu_device> m_maincpu;
 	required_device<screen_device> m_screen;
@@ -91,8 +93,7 @@ protected:
 	required_device<i8251_device> m_usart;
 //  required_device<cassette_image_device> m_cassette;
 	required_device<beep_device> m_beeper;
-	required_device<speaker_device> m_lspeaker;
-	required_device<speaker_device> m_rspeaker;
+	required_device<speaker_device> m_speaker;
 	required_device<palette_device> m_palette;
 	required_region_ptr<u8> m_n80rom;
 	required_region_ptr<u8> m_n88rom;
@@ -101,31 +102,33 @@ protected:
 	required_region_ptr<u8> m_kanji_lv2_rom;
 	required_device<msx_general_purpose_port_device> m_mouse_port;
 	required_device<pc8801_exp_slot_device> m_exp;
+	memory_view m_window_view;
+	required_device<address_map_bank_device> m_gvram_bank;
 
 	void int4_irq_w(int state);
 
+	std::unique_ptr<uint8_t[]> m_gvram;
 	uint8_t m_gfx_ctrl = 0;
+	uint8_t m_vram_sel = 0;
+	uint8_t m_misc_ctrl = 0;
 
+	virtual void flush_gvram_access();
+
+	virtual uint8_t wram_c000_r(offs_t offset);
 private:
-	void main_map(address_map &map);
+	void wram_c000_w(offs_t offset, uint8_t data);
 
 	std::unique_ptr<uint8_t[]> m_work_ram;
 	std::unique_ptr<uint8_t[]> m_hi_work_ram;
 	std::unique_ptr<uint8_t[]> m_ext_work_ram;
-	std::unique_ptr<uint8_t[]> m_gvram;
 
 	std::array<std::array<u16, 80>, 400> m_attr_info = {};
 
 	uint8_t m_ext_rom_bank = 0;
-	uint8_t m_vram_sel = 0;
-	uint8_t m_misc_ctrl = 0;
 	uint8_t m_device_ctrl_data = 0;
 	uint8_t m_window_offset_bank = 0;
 	bool m_text_layer_mask = false;
 	u8 m_bitmap_layer_mask = 0;
-	uint8_t m_alu_reg[3]{};
-	uint8_t m_alu_ctrl1 = 0;
-	uint8_t m_alu_ctrl2 = 0;
 	uint8_t m_extram_mode = 0;
 	uint8_t m_extram_bank = 0;
 	uint32_t m_extram_size = 0;
@@ -138,8 +141,6 @@ private:
 
 	uint32_t m_knj_addr[2]{};
 
-	uint8_t alu_r(offs_t offset);
-	void alu_w(offs_t offset, uint8_t data);
 	uint8_t wram_r(offs_t offset);
 	void wram_w(offs_t offset, uint8_t data);
 	uint8_t ext_wram_r(offs_t offset);
@@ -172,8 +173,6 @@ private:
 	void extram_mode_w(uint8_t data);
 	uint8_t extram_bank_r();
 	void extram_bank_w(uint8_t data);
-	void alu_ctrl1_w(uint8_t data);
-	void alu_ctrl2_w(uint8_t data);
 	template <unsigned kanji_level> uint8_t kanji_r(offs_t offset);
 	template <unsigned kanji_level> void kanji_w(offs_t offset, uint8_t data);
 //  void rtc_w(uint8_t data);
@@ -222,41 +221,70 @@ public:
 	pc8801mk2sr_state(const machine_config &mconfig, device_type type, const char *tag)
 		: pc8801_state(mconfig, type, tag)
 		, m_opn(*this, "opn")
+		, m_alu_view(*this, "alu_view")
 	{ }
 
 	void pc8801mk2sr(machine_config &config);
 	void pc8801mk2mr(machine_config &config);
 
 protected:
-	virtual void main_io(address_map &map) override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
+
+	virtual void main_map(address_map &map) override ATTR_COLD;
+	virtual void main_io(address_map &map) override ATTR_COLD;
 
 	uint8_t opn_porta_r();
 	uint8_t opn_portb_r();
 	void opn_portb_w(uint8_t data);
 
+	void alu_ctrl1_w(uint8_t data);
+	void alu_ctrl2_w(uint8_t data);
+
 private:
 	optional_device<ym2203_device> m_opn;
+	memory_view m_alu_view;
+
+	uint8_t m_alu_reg[3]{};
+	uint8_t m_alu_ctrl1 = 0;
+	uint8_t m_alu_ctrl2 = 0;
+
+	uint8_t alu_r(offs_t offset);
+	void alu_w(offs_t offset, uint8_t data);
+
+	virtual void flush_gvram_access() override;
 };
 
-// both FH and MH family bases sports selectable 8/4 MHz CPU clock switch
+// FH and MH families and beyond has selectable 8/4 MHz CPU clock switch
 class pc8801fh_state : public pc8801mk2sr_state
 {
 public:
 	pc8801fh_state(const machine_config &mconfig, device_type type, const char *tag)
 		: pc8801mk2sr_state(mconfig, type, tag)
+		, m_eeprom(*this, "eeprom")
 		, m_opna(*this, "opna")
+		, m_setup_mem_view(*this, "setup_mem_view")
+		, m_setup_io_view(*this, "setup_io_view")
 	{ }
 
 	void pc8801fh(machine_config &config);
 
-protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
-	virtual void main_io(address_map &map) override;
+	template <bool IS_DUMPED> void init_setup_mode();
 
+protected:
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
+
+	virtual void main_map(address_map &map) override ATTR_COLD;
+	virtual void main_io(address_map &map) override ATTR_COLD;
+
+	bool m_has_setup_mode;
 private:
+	required_device<pc88_sdip_device> m_eeprom;
 	required_device<ym2608_device> m_opna;
-	void opna_map(address_map &map);
+	memory_view m_setup_mem_view;
+	memory_view m_setup_io_view;
+	void opna_map(address_map &map) ATTR_COLD;
 
 	uint8_t cpuclock_r();
 	uint8_t baudrate_r();
@@ -266,6 +294,7 @@ private:
 	uint8_t m_baudrate_val = 0;
 };
 
+// MA has a newer floppy BIOS, an extra dictionary ROM and optional bay for CD-ROM i/f
 class pc8801ma_state : public pc8801fh_state
 {
 public:
@@ -277,13 +306,13 @@ public:
 	void pc8801ma(machine_config &config);
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
-	virtual void main_io(address_map &map) override;
+	virtual void main_io(address_map &map) override ATTR_COLD;
 
-	virtual uint8_t dictionary_rom_r(offs_t offset) override;
-	virtual bool dictionary_rom_enable() override;
+	uint8_t dictionary_rom_r(offs_t offset);
+	virtual uint8_t wram_c000_r(offs_t offset) override;
 
 private:
 	void dic_bank_w(uint8_t data);
@@ -301,15 +330,19 @@ public:
 		: pc8801ma_state(mconfig, type, tag)
 		, m_cdrom_if(*this, "cdrom_if")
 		, m_cdrom_bios(*this, "cdrom_bios")
+		, m_memsw(*this, "memsw")
+		, m_memsw_view(*this, "memsw_view")
 	{ }
 
 	void pc8801mc(machine_config &config);
+	void init_pc8801mc();
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
-	virtual void main_io(address_map &map) override;
+	virtual void main_map(address_map &map) override ATTR_COLD;
+	virtual void main_io(address_map &map) override ATTR_COLD;
 
 private:
 	virtual uint8_t cdbios_rom_r(offs_t offset) override;
@@ -317,6 +350,8 @@ private:
 
 	required_device<pc8801_31_device> m_cdrom_if;
 	required_region_ptr<u8> m_cdrom_bios;
+	required_device<pc8801mc_memsw_device> m_memsw;
+	memory_view m_memsw_view;
 
 	bool m_cdrom_bank = true;
 };

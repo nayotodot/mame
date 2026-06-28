@@ -486,7 +486,8 @@ Notes:
       TMP68000N-10- Toshiba TMP68000N-10 CPU, running at 10.000MHz (SDIP64, clock 20 / 2)
       82C51       - Toshiba 82C51AM-10 Programmable 8-bit I/O Serial Interface (SOP28)
       DSW1        - 4 position Dip Switch
-      MB8464      - Fujitsu MB8464 8k x8 SRAM (DIP28)
+      MB8464      - Fujitsu MB8464 8k x8 SRAM (DIP28). Jumpers JP5 and JP6 next to the RAMs are tied to A13 and A14 on the CPU
+                    buffers to allow larger RAMs to be used but both jumpers are set to VCC so only 8kB RAMs are actually used on the sound board.
       3771        - Fujitsu MB3771 Master Reset IC (DIP8)
       TL062       - ST Microelectronics Dual Low Power Operational Amplifier (DIP8)
       PC910       - Sharp PC910 opto-isolator (DIP8)
@@ -601,7 +602,6 @@ Notes:
 #include "machine/nvram.h"
 #include "speaker.h"
 
-#include "vr.lh"
 #include "model1io2.lh"
 
 // On the real system, another 315-5338A is acting as slave
@@ -804,7 +804,7 @@ void model1_state::irq_raise(int level)
 	m_maincpu->set_input_line(0, ASSERT_LINE);
 }
 
-IRQ_CALLBACK_MEMBER(model1_state::irq_callback)
+u8 model1_state::irq_callback()
 {
 	for (int i = 0; i < 8; i++)
 		if (BIT(m_irq_status, i))
@@ -1077,7 +1077,7 @@ static INPUT_PORTS_START( swa )
 	PORT_BIT( 0xff, 0x7f, IPT_AD_STICK_X ) PORT_MINMAX(27,227) PORT_SENSITIVITY(100) PORT_KEYDELTA(4)  PORT_REVERSE
 
 	PORT_START("STICK1Y")
-	PORT_BIT( 0xff, 0x7f, IPT_AD_STICK_Y ) PORT_MINMAX(27,227) PORT_SENSITIVITY(100) PORT_KEYDELTA(4)  PORT_REVERSE
+	PORT_BIT( 0xff, 0x7f, IPT_AD_STICK_Y ) PORT_MINMAX(27,227) PORT_SENSITIVITY(100) PORT_KEYDELTA(4)
 
 	PORT_START("THROTTLE")
 	PORT_BIT( 0xff, 0x7f, IPT_PEDAL )      PORT_MINMAX(28,200) PORT_SENSITIVITY(100) PORT_KEYDELTA(16) PORT_REVERSE
@@ -1370,10 +1370,10 @@ ROM_START( swa )
 	ROM_LOAD( "mpr-16484.4", 0x000000, 0x200000, CRC(9d4c334d) SHA1(8b4d903f14559fed425d225bb23ccfe8da23cbd3) )
 	ROM_LOAD( "mpr-16485.5", 0x200000, 0x200000, CRC(95aadcad) SHA1(4276db655db9834692c3843eb96a3e3a89cb7252) )
 
-	ROM_REGION( 0x20000, "mpegcpu", 0 ) /* Z80 DSB code */
+	ROM_REGION( 0x20000, "dsbz80:mpegcpu", 0 ) /* Z80 DSB code */
 	ROM_LOAD( "epr-16471.2", 0x000000, 0x020000, CRC(f4ee84a4) SHA1(f12b214e6f195b0e5f49ba9f41d8e54bfcea9acc) )
 
-	ROM_REGION( 0x800000, "mpeg", 0 ) /* DSB MPEG data */
+	ROM_REGION( 0x800000, "dsbz80:mpeg", 0 ) /* DSB MPEG data */
 	ROM_LOAD( "mpr-16514.57", 0x000000, 0x200000, CRC(3175b0be) SHA1(63649d053c8c17ce1746d16d0cc8202be20c302f) )
 	ROM_LOAD( "mpr-16515.58", 0x200000, 0x200000, CRC(3114d748) SHA1(9ef090623cdd2a1d06b5d1bc4b9a07ab4eff5b76) )
 
@@ -1418,10 +1418,10 @@ ROM_START( swaj )
 	ROM_LOAD( "mpr-16484.4", 0x000000, 0x200000, CRC(9d4c334d) SHA1(8b4d903f14559fed425d225bb23ccfe8da23cbd3) )
 	ROM_LOAD( "mpr-16485.5", 0x200000, 0x200000, CRC(95aadcad) SHA1(4276db655db9834692c3843eb96a3e3a89cb7252) )
 
-	ROM_REGION( 0x20000, "mpegcpu", 0 ) /* Z80 DSB code */
+	ROM_REGION( 0x20000, "dsbz80:mpegcpu", 0 ) /* Z80 DSB code */
 	ROM_LOAD( "epr-16471.2", 0x000000, 0x020000, CRC(f4ee84a4) SHA1(f12b214e6f195b0e5f49ba9f41d8e54bfcea9acc) )
 
-	ROM_REGION( 0x400000, "mpeg", 0 ) /* DSB MPEG data */
+	ROM_REGION( 0x400000, "dsbz80:mpeg", 0 ) /* DSB MPEG data */
 	ROM_LOAD( "mpr-16514.57", 0x000000, 0x200000, CRC(3175b0be) SHA1(63649d053c8c17ce1746d16d0cc8202be20c302f) )
 	ROM_LOAD( "mpr-16515.58", 0x200000, 0x200000, CRC(3114d748) SHA1(9ef090623cdd2a1d06b5d1bc4b9a07ab4eff5b76) )
 
@@ -1710,19 +1710,20 @@ ROM_END
 
 void model1_state::model1(machine_config &config)
 {
-	V60(config, m_maincpu, 16000000);
+	V60(config, m_maincpu, 32_MHz_XTAL / 2);
 	m_maincpu->set_addrmap(AS_PROGRAM, &model1_state::model1_mem);
 	m_maincpu->set_addrmap(AS_IO, &model1_state::model1_io);
-	m_maincpu->set_irq_acknowledge_callback(FUNC(model1_state::irq_callback));
+	m_maincpu->irq_cycle_callback().set(FUNC(model1_state::irq_callback));
 
-	NVRAM(config, "nvram", nvram_device::DEFAULT_ALL_0); // 2x MB84256A-70LL + battery
+	// vf (at least) depends on default being 1-filled for ranking to initialize properly
+	NVRAM(config, "nvram", nvram_device::DEFAULT_ALL_1); // 2x MB84256A-70LL + battery
 
-	GENERIC_FIFO_U32(config, "copro_fifo_in", 0);
-	GENERIC_FIFO_U32(config, "copro_fifo_out", 0);
+	GENERIC_FIFO_U32(config, "copro_fifo_in");
+	GENERIC_FIFO_U32(config, "copro_fifo_out");
 
 	TIMER(config, "scantimer").configure_scanline(FUNC(model1_state::model1_interrupt), "screen", 0, 1);
 
-	MB86233(config, m_tgp_copro, 16000000);
+	MB86233(config, m_tgp_copro, 40_MHz_XTAL);
 	m_tgp_copro->set_addrmap(AS_PROGRAM, &model1_state::copro_prog_map);
 	m_tgp_copro->set_addrmap(AS_DATA, &model1_state::copro_data_map);
 	m_tgp_copro->set_addrmap(AS_IO, &model1_state::copro_io_map);
@@ -1739,15 +1740,15 @@ void model1_state::model1(machine_config &config)
 	PALETTE(config, m_palette).set_format(palette_device::xBGR_555, 8192);
 
 	// create SEGA_MODEL1IO device *after* SCREEN device
-	model1io_device &ioboard(SEGA_MODEL1IO(config, "ioboard", 0));
+	model1io_device &ioboard(SEGA_MODEL1IO(config, "ioboard"));
 	ioboard.read_callback().set(m_dpram, FUNC(mb8421_device::left_r));
 	ioboard.write_callback().set(m_dpram, FUNC(mb8421_device::left_w));
 	ioboard.in_callback<0>().set_ioport("IN.0");
 	ioboard.in_callback<1>().set_ioport("IN.1");
 
-	MB8421(config, m_dpram, 0);
+	MB8421(config, m_dpram);
 
-	SEGAM1AUDIO(config, m_m1audio, 0);
+	SEGAM1AUDIO(config, m_m1audio);
 	m_m1audio->rxd_handler().set(m_m1uart, FUNC(i8251_device::write_rxd));
 
 	I8251(config, m_m1uart, 8000000); // uPD71051C, clock unknown
@@ -1783,7 +1784,7 @@ void model1_state::vr(machine_config &config)
 	ioboard.output_callback().set(FUNC(model1_state::vr_outputs_w));
 	ioboard.output_callback().append(FUNC(model1_state::gen_outputs_w));
 
-	M1COMM(config, "m1comm", 0).set_default_bios_tag("epr15112");
+	M1COMM(config, "m1comm").set_default_bios_tag("epr15112");
 }
 
 void model1_state::vformula(machine_config &config)
@@ -1800,7 +1801,7 @@ void model1_state::vformula(machine_config &config)
 	ioboard.output_callback().set(FUNC(model1_state::vr_outputs_w));
 	ioboard.output_callback().append(FUNC(model1_state::gen_outputs_w));
 
-	M1COMM(config, "m1comm", 0).set_default_bios_tag("epr15624");
+	M1COMM(config, "m1comm").set_default_bios_tag("epr15624");
 }
 
 void model1_state::swa(machine_config &config)
@@ -1817,11 +1818,10 @@ void model1_state::swa(machine_config &config)
 	ioboard.output_callback().set(FUNC(model1_state::swa_outputs_w));
 	ioboard.output_callback().append(FUNC(model1_state::gen_outputs_w));
 
-	SPEAKER(config, "dleft").front_left();
-	SPEAKER(config, "dright").front_right();
-	DSBZ80(config, m_dsbz80, 0);
-	m_dsbz80->add_route(0, "dleft", 1.0);
-	m_dsbz80->add_route(1, "dright", 1.0);
+	SPEAKER(config, "mpeg", 2).front();
+	DSBZ80(config, m_dsbz80);
+	m_dsbz80->add_route(0, "mpeg", 1.0, 0);
+	m_dsbz80->add_route(1, "mpeg", 1.0, 1);
 
 	// Apparently m1audio has to filter out commands the DSB shouldn't see
 	m_m1audio->rxd_handler().append(m_dsbz80, FUNC(dsbz80_device::write_txd));
@@ -1847,7 +1847,7 @@ void model1_state::wingwar(machine_config &config)
 
 	config.set_default_layout(layout_model1io2);
 
-	M1COMM(config, "m1comm", 0).set_default_bios_tag("epr15112");
+	M1COMM(config, "m1comm").set_default_bios_tag("epr15112");
 }
 
 void model1_state::wingwar360(machine_config &config)

@@ -28,7 +28,7 @@ public:
 	void jv880(machine_config &config);
 
 private:
-	void jv880_mem_map(address_map &map);
+	void jv880_mem_map(address_map &map) ATTR_COLD;
 
 	required_device<h8532_device> m_maincpu;
 	required_device<tc6116_device> m_pcm;
@@ -73,7 +73,7 @@ public:
 	void rd500(machine_config &config);
 
 private:
-	void rd500_mem_map(address_map &map);
+	void rd500_mem_map(address_map &map) ATTR_COLD;
 
 	u8 keyscan_r(offs_t offset);
 	void keyscan_w(offs_t offset, u8 data);
@@ -84,7 +84,7 @@ private:
 
 void roland_rd500_state::rd500_mem_map(address_map &map)
 {
-	map(0x000000, 0x8fffff).rom().region("progrom", 0);
+	map(0x000000, 0x07ffff).rom().region("progrom", 0);
 	map(0x900000, 0x90ffff).ram();
 	map(0xa00000, 0xa0ffff).rw(m_pcm, FUNC(tc6116_device::read), FUNC(tc6116_device::write));
 	map(0xc00000, 0xc0ffff).rw(FUNC(roland_rd500_state::keyscan_r), FUNC(roland_rd500_state::keyscan_w));
@@ -128,10 +128,10 @@ ROM_START(jv880)
 ROM_END
 
 ROM_START(rd500)
-	ROM_REGION(0x80000, "progrom", 0)
-	ROM_LOAD("rd500_rom.bin", 0x00000, 0x80000, CRC(668fc7e9) SHA1(59e28d3e2190902dd6fd02a9820f96e383781178))
+	ROM_REGION16_BE(0x80000, "progrom", 0)
+	ROM_LOAD16_WORD_SWAP("rd500_rom.bin", 0x00000, 0x80000, CRC(668fc7e9) SHA1(59e28d3e2190902dd6fd02a9820f96e383781178))
 
-	ROM_REGION(0x400000, "waverom", 0)
+	ROM_REGION(0x800000, "waverom", 0)
 	ROM_LOAD("roland-a_r00342978.ic4", 0x000000, 0x200000, CRC(c885bf4f) SHA1(e14f0f4a8181e09fae7db10130e4ed3cd6bf5a34))
 	ROM_LOAD("roland-b_r00343012.ic5", 0x200000, 0x200000, CRC(ceb02d33) SHA1(9f6969d94598c68902188085d0c91fb8b300d762))
 	ROM_LOAD("roland-c_r00343023.ic6", 0x400000, 0x200000, CRC(f627cdb7) SHA1(7b834fee5db5a7377ec7f66172d0fa3096cefbc9))
@@ -141,6 +141,6 @@ ROM_END
 } // anonymous namespace
 
 
-//SYST(1992, jv80, 0, 0, jv80, jv80, roland_jv80_state, empty_init, "Roland", "JV-80 Multi Timbral Synthesizer", MACHINE_IS_SKELETON)
-SYST(1992, jv880, 0, 0, jv880, jv880, roland_jv80_state, empty_init, "Roland", "JV-880 Multi Timbral Synthesizer Module", MACHINE_IS_SKELETON)
-SYST(1994, rd500, 0, 0, rd500, rd500, roland_rd500_state, empty_init, "Roland", "RD-500 Digital Piano", MACHINE_IS_SKELETON)
+//SYST(1992, jv80, 0, 0, jv80, jv80, roland_jv80_state, empty_init, "Roland", "JV-80 Multi Timbral Synthesizer", MACHINE_NO_SOUND | MACHINE_NOT_WORKING)
+SYST(1992, jv880, 0, 0, jv880, jv880, roland_jv80_state, empty_init, "Roland", "JV-880 Multi Timbral Synthesizer Module", MACHINE_NO_SOUND | MACHINE_NOT_WORKING)
+SYST(1994, rd500, 0, 0, rd500, rd500, roland_rd500_state, empty_init, "Roland", "RD-500 Digital Piano", MACHINE_NO_SOUND | MACHINE_NOT_WORKING)

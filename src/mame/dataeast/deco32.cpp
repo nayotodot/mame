@@ -52,6 +52,8 @@
 
     Z80 Sound cpu version games : Music tempo is unverified (it has external timer / IRQ controller?).
 
+    Dragongun: Sprite flickers during attract demo
+
 
 
 Locked 'n Loaded (US)
@@ -157,6 +159,7 @@ DE-0397-0   DEC-22VO
 |  CN3      LH52250  LH52250   LX-00          |-----| |
 |-----------------------------------------------------|
 Notes:
+       Also seen with 28.0MHz and 32.22MHz XTALs (matches the other games in this driver, MAME chooses this configuration).
        The CPU is chip 156. It's an encrypted ARM-based CPU. The CPU is running at 7.0805MHz [28.322/4]
 
        Z80B      - Goldstar Z8400B, running at 3.5555MHz [32/9]
@@ -524,7 +527,7 @@ void dragngun_state::dragngun_map(address_map &map)
 
 	map(0x0300000, 0x03fffff).rom().region("maincpu", 0x100000);
 	map(0x0400000, 0x0400000).rw("oki3", FUNC(okim6295_device::read), FUNC(okim6295_device::write));
-	map(0x0410000, 0x0410003).w(FUNC(dragngun_state::volume_w));
+	map(0x0410000, 0x0410000).w(FUNC(dragngun_state::lc7535_volume_w));
 	map(0x0418000, 0x0418003).w(FUNC(dragngun_state::speaker_switch_w));
 	map(0x0420000, 0x0420000).rw(FUNC(dragngun_state::eeprom_r), FUNC(dragngun_state::eeprom_w));
 	map(0x0430000, 0x043001f).w(FUNC(dragngun_state::lightgun_w));
@@ -570,7 +573,7 @@ void dragngun_state::lockload_map(address_map &map)
 	namcosprite_map(map);
 
 	map(0x300000, 0x3fffff).rom().region("maincpu", 0x100000);
-	map(0x410000, 0x410003).w(FUNC(dragngun_state::volume_w));
+	map(0x410000, 0x410000).w(FUNC(dragngun_state::volume_w));
 	map(0x420000, 0x420000).rw(FUNC(dragngun_state::eeprom_r), FUNC(dragngun_state::eeprom_w));
 	map(0x440000, 0x440003).portr("IN2");
 	map(0x500000, 0x500003).w(FUNC(dragngun_state::sprite_control_w));
@@ -730,7 +733,8 @@ void deco32_state::ioprot_w(offs_t offset, u16 data, u16 mem_mask)
 
 void deco32_state::volume_w(u8 data)
 {
-	// TODO: assume linear with a 0.0-1.0 dB scale for now
+	// TODO: Assumes linear scaling
+	// values go from 0x00 (max volume) to 0xff (min volume)
 	const u8 raw_vol = 0xff - data;
 	const float vol_output = float(raw_vol) / 255.0f;
 
@@ -747,52 +751,35 @@ u8 captaven_state::captaven_soundcpu_status_r()
 	return 0xff;
 }
 
-void dragngun_state::volume_w(u32 data)
+void dragngun_state::lc7535_volume_w(u8 data)
 {
 	m_vol_main->ce_w(BIT(data, 2));
 	m_vol_main->clk_w(BIT(data, 1));
 	m_vol_main->di_w(BIT(data, 0));
 
-	if (m_vol_gun.found())
-	{
-		m_vol_gun->ce_w(BIT(data, 2));
-		m_vol_gun->clk_w(BIT(data, 1));
-		m_vol_gun->di_w(BIT(data, 0));
-	}
+	m_vol_gun->ce_w(BIT(data, 2));
+	m_vol_gun->clk_w(BIT(data, 1));
+	m_vol_gun->di_w(BIT(data, 0));
 }
 
 void dragngun_state::speaker_switch_w(u32 data)
 {
-	// TODO: This should switch the oki3 output between the gun speaker and the standard speakers
-	m_gun_speaker_disabled = bool(BIT(data, 0));
+	bool gun_speaker_disabled = bool(BIT(data, 0));
 
-	logerror("Gun speaker: %s\n", m_gun_speaker_disabled ? "Disabled" : "Enabled");
-}
+	if (gun_speaker_disabled)
+	{
+		m_oki[2]->set_route_gain(0, m_vol_main, 0, 1.0);
+		m_oki[2]->set_route_gain(0, m_vol_main, 1, 1.0);
+		m_oki[2]->set_route_gain(0, m_vol_gun, 0, 0.0);
+	}
+	else
+	{
+		m_oki[2]->set_route_gain(0, m_vol_main, 0, 0.0);
+		m_oki[2]->set_route_gain(0, m_vol_main, 1, 0.0);
+		m_oki[2]->set_route_gain(0, m_vol_gun, 0, 1.0);
+	}
 
-LC7535_VOLUME_CHANGED( dragngun_state::volume_main_changed )
-{
-	// TODO: Support loudness
-	logerror("Main speaker volume: left = %d dB, right %d dB, loudness = %s\n", attenuation_left, attenuation_right, loudness ? "on" :"off");
-
-	// convert to 0.0 - 1.0
-	const float gain_l = m_vol_main->normalize(attenuation_left);
-	const float gain_r = m_vol_main->normalize(attenuation_right);
-
-	m_ym2151->set_output_gain(0, gain_l);
-	m_ym2151->set_output_gain(1, gain_r); // left and right are always set to the same value
-	m_oki[0]->set_output_gain(ALL_OUTPUTS, gain_l);
-	m_oki[1]->set_output_gain(ALL_OUTPUTS, gain_l);
-
-	if (m_oki[2].found() && m_gun_speaker_disabled)
-		m_oki[2]->set_output_gain(ALL_OUTPUTS, gain_l);
-}
-
-LC7535_VOLUME_CHANGED( dragngun_state::volume_gun_changed )
-{
-	logerror("Gun speaker volume: left = %d dB, right %d dB, loudness = %s\n", attenuation_left, attenuation_right, loudness ? "on" :"off");
-
-	if (m_oki[2].found() && !m_gun_speaker_disabled)
-		m_oki[2]->set_output_gain(ALL_OUTPUTS, m_vol_gun->normalize(attenuation_left));
+	logerror("%s: Gun speaker: %s\n", machine().describe_context(), gun_speaker_disabled ? "Disabled" : "Enabled");
 }
 
 void tattass_state::tattass_sound_irq_w(int state)
@@ -815,7 +802,7 @@ void deco32_state::sound_bankswitch_w(u8 data)
 void dragngun_state::lockload_okibank_lo_w(u8 data)
 {
 	m_oki2_bank = (m_oki2_bank & 2) | ((data >> 1) & 1);
-	logerror("Load OKI2 Bank Low bits: %02x, Current : %02x\n",(data >> 1) & 1, m_oki2_bank);
+	logerror("%s: Load OKI2 Bank Low bits: %02x, Current : %02x\n", machine().describe_context(), (data >> 1) & 1, m_oki2_bank);
 	m_oki[0]->set_rom_bank((data >> 0) & 1);
 	m_oki[1]->set_rom_bank(m_oki2_bank);
 }
@@ -823,7 +810,7 @@ void dragngun_state::lockload_okibank_lo_w(u8 data)
 void dragngun_state::lockload_okibank_hi_w(u8 data)
 {
 	m_oki2_bank = (m_oki2_bank & 1) | ((data & 1) << 1); // TODO : Actually value unverified
-	logerror("Load OKI2 Bank Hi bits: %02x, Current : %02x\n",((data & 1) << 1), m_oki2_bank);
+	logerror("%s: Load OKI2 Bank Hi bits: %02x, Current : %02x\n", machine().describe_context(), ((data & 1) << 1), m_oki2_bank);
 	m_oki[1]->set_rom_bank(m_oki2_bank);
 }
 
@@ -977,13 +964,14 @@ u32 dragngun_state::lightgun_r()
 	case 7: return m_io_light_y[1]->read();
 	}
 
-//  logerror("Illegal lightgun port %d read \n",m_lightgun_port);
+	//if (!machine().side_effects_disabled())
+		//logerror("%s: Illegal lightgun port %d read \n", machine().describe_context(), m_lightgun_port);
 	return 0;
 }
 
 void dragngun_state::lightgun_w(offs_t offset, u32 data)
 {
-//  logerror("Lightgun port %d\n",m_lightgun_port);
+//  logerror("%s: Lightgun port %d\n", machine().describe_context(), m_lightgun_port);
 	m_lightgun_port = offset;
 }
 
@@ -1065,7 +1053,7 @@ void tattass_state::tattass_control_w(offs_t offset, u32 data, u32 mem_mask)
 		{
 			if (m_buf_ptr)
 			{
-				logerror("Eprom reset (bit count %d): ", m_read_bit_count);
+				logerror("%s: Eprom reset (bit count %d): ", machine().describe_context(), m_read_bit_count);
 				for (int i = 0; i < m_buf_ptr; i++)
 					logerror("%s", BIT(m_buffer, m_buf_ptr - 1 - i) ? "1" : "0");
 				logerror("\n");
@@ -1081,7 +1069,7 @@ void tattass_state::tattass_control_w(offs_t offset, u32 data, u32 mem_mask)
 		{
 			if (m_buf_ptr >= 32)
 			{
-				logerror("Eprom overflow!");
+				logerror("%s: Eprom overflow!\n", machine().describe_context());
 				m_buf_ptr = 0;
 			}
 
@@ -1137,7 +1125,7 @@ void tattass_state::tattass_control_w(offs_t offset, u32 data, u32 mem_mask)
 				}
 				else
 				{
-					logerror("Detected unknown eprom command\n");
+					logerror("%s: Detected unknown eprom command\n", machine().describe_context());
 				}
 			}
 		}
@@ -1145,7 +1133,7 @@ void tattass_state::tattass_control_w(offs_t offset, u32 data, u32 mem_mask)
 		{
 			if (!(BIT(data, 6)))
 			{
-				logerror("Cs set low\n");
+				logerror("%s: Cs set low\n", machine().describe_context());
 				m_buf_ptr = 0;
 			}
 		}
@@ -1568,7 +1556,7 @@ static INPUT_PORTS_START( fghthist )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
 	PORT_SERVICE_NO_TOGGLE( 0x0008, IP_ACTIVE_LOW )
-	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -1605,7 +1593,7 @@ static INPUT_PORTS_START( dragngun )
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
-	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 
 	PORT_START("DSW")
 	PORT_BIT( 0x00ff, IP_ACTIVE_LOW, IPT_UNUSED ) // Would be a dipswitch, but only 1 present on board
@@ -1635,7 +1623,7 @@ static INPUT_PORTS_START( dragngun )
 	PORT_DIPSETTING(      0x0000, DEF_STR( On ) )
 
 	PORT_START("IN2")
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_VBLANK("screen") // is this actually vblank?
+	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank)) // is this actually vblank?
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_SERVICE( 0x0004, IP_ACTIVE_LOW )
 	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_UNKNOWN ) //check  //test BUTTON F2
@@ -1663,7 +1651,7 @@ static INPUT_PORTS_START( lockload )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0008, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(1) PORT_NAME("P1 Fire") PORT_CHANGED_MEMBER(DEVICE_SELF, dragngun_state, lockload_gun_trigger, 0)
+	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(1) PORT_NAME("P1 Fire") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(dragngun_state::lockload_gun_trigger), 0)
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(1) PORT_NAME("P1 Reload")
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_START1 )
@@ -1671,7 +1659,7 @@ static INPUT_PORTS_START( lockload )
 	PORT_BIT( 0x0200, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0400, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0800, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(2) PORT_NAME("P2 Fire") PORT_CHANGED_MEMBER(DEVICE_SELF, dragngun_state, lockload_gun_trigger, 1)
+	PORT_BIT( 0x1000, IP_ACTIVE_LOW, IPT_BUTTON1 ) PORT_PLAYER(2) PORT_NAME("P2 Fire") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(dragngun_state::lockload_gun_trigger), 1)
 	PORT_BIT( 0x2000, IP_ACTIVE_LOW, IPT_BUTTON2 ) PORT_PLAYER(2) PORT_NAME("P2 Reload")
 	PORT_BIT( 0x4000, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x8000, IP_ACTIVE_LOW, IPT_START2 )
@@ -1680,7 +1668,7 @@ static INPUT_PORTS_START( lockload )
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
-	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 
 	PORT_START("DSW")
 	PORT_BIT( 0x00ff, IP_ACTIVE_LOW, IPT_UNUSED ) // Would be a dipswitch, but only 1 present on board
@@ -1710,7 +1698,7 @@ static INPUT_PORTS_START( lockload )
 	PORT_DIPSETTING(      0x0000, DEF_STR( On ) )
 
 	PORT_START("IN2")
-	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_SERVICE( 0x0004, IP_ACTIVE_LOW )
 	PORT_BIT( 0x00f8, IP_ACTIVE_LOW, IPT_UNUSED ) //check  //test BUTTON F2
@@ -1752,7 +1740,7 @@ static INPUT_PORTS_START( tattass )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
 	PORT_SERVICE_NO_TOGGLE( 0x0008, IP_ACTIVE_LOW )
-	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_UNUSED ) // 'soundmask'
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_UNUSED )
@@ -1790,7 +1778,7 @@ static INPUT_PORTS_START( nslasher )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
 	PORT_SERVICE_NO_TOGGLE( 0x0008, IP_ACTIVE_LOW )
-	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0010, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_UNUSED ) // 'soundmask'
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x0080, IP_ACTIVE_LOW, IPT_UNUSED )
@@ -1901,30 +1889,30 @@ GFXDECODE_END
 void captaven_state::captaven(machine_config &config)
 {
 	// basic machine hardware
-	ARM(config, m_maincpu, XTAL(28'000'000)/4); // verified on pcb (Data East 101 custom)*/
+	ARM(config, m_maincpu, 28_MHz_XTAL / 4); // verified on pcb (Data East 101 custom)*/
 	m_maincpu->set_addrmap(AS_PROGRAM, &captaven_state::captaven_map);
 
-	h6280_device &audiocpu(H6280(config, m_audiocpu, XTAL(32'220'000)/4/3));  // pin 10 is 32mhz/4, pin 14 is High so internal divisor is 3 (verified on pcb)
+	h6280_device &audiocpu(H6280(config, m_audiocpu, 32.22_MHz_XTAL / 4 / 3)); // pin 10 is 32mhz/4, pin 14 is High so internal divisor is 3 (verified on pcb)
 	audiocpu.set_addrmap(AS_PROGRAM, &captaven_state::h6280_sound_map);
-	audiocpu.add_route(ALL_OUTPUTS, "lspeaker", 0); // internal sound unused
-	audiocpu.add_route(ALL_OUTPUTS, "rspeaker", 0);
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 0); // internal sound unused
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 1);
 
 	INPUT_MERGER_ANY_HIGH(config, "irq_merger").output_handler().set_inputline(m_maincpu, ARM_IRQ_LINE);
 
-	DECO_IRQ(config, m_deco_irq, 0);
+	DECO_IRQ(config, m_deco_irq);
 	m_deco_irq->set_screen_tag(m_screen);
 	m_deco_irq->raster2_irq_callback().set("irq_merger", FUNC(input_merger_any_high_device::in_w<0>));
 	m_deco_irq->vblank_irq_callback().set("irq_merger", FUNC(input_merger_any_high_device::in_w<1>));
 
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_raw(XTAL(28'000'000) / 4, 442, 0, 320, 274, 8, 248);
+	m_screen->set_raw(28_MHz_XTAL / 4, 442, 0, 320, 274, 8, 248);
 	m_screen->set_screen_update(FUNC(captaven_state::screen_update));
 	m_screen->set_palette(m_palette);
 
 	GFXDECODE(config, m_gfxdecode, m_palette, gfx_captaven);
 	PALETTE(config, m_palette).set_format(palette_device::xBGR_888, 2048);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf1_col_bank(0x20);
@@ -1935,7 +1923,7 @@ void captaven_state::captaven(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO16IC(config, m_deco_tilegen[1], 0);    // pf3 is in 8bpp mode, pf4 is not used
+	DECO16IC(config, m_deco_tilegen[1]);    // pf3 is in 8bpp mode, pf4 is not used
 	m_deco_tilegen[1]->set_pf1_size(DECO_32x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_32x32);
 	m_deco_tilegen[1]->set_pf1_col_bank(0x04);
@@ -1949,57 +1937,56 @@ void captaven_state::captaven(machine_config &config)
 	m_deco_tilegen[1]->set_pf12_16x16_bank(2);
 	m_deco_tilegen[1]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO_SPRITE(config, m_sprgen[0], 0, m_palette, gfx_captaven_spr);
+	DECO_SPRITE(config, m_sprgen[0], m_palette, gfx_captaven_spr);
 	m_sprgen[0]->set_pri_callback(FUNC(captaven_state::captaven_pri_callback));
 	m_sprgen[0]->set_alt_format(true);
 
-	DECO146PROT(config, m_ioprot, 0);
+	DECO146PROT(config, m_ioprot);
 	m_ioprot->port_a_cb().set_ioport("IN0");
 	m_ioprot->port_b_cb().set_ioport("SYSTEM");
 	m_ioprot->port_c_cb().set_ioport("IN1");
 	m_ioprot->soundlatch_irq_cb().set_inputline(m_audiocpu, 0);
 
 	// sound hardware
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
-	YM2151(config, m_ym2151, XTAL(32'220'000)/9); // verified on pcb
+	YM2151(config, m_ym2151, 32.22_MHz_XTAL / 9); // verified on pcb
 	m_ym2151->irq_handler().set_inputline(m_audiocpu, 1);
 	m_ym2151->port_write_handler().set(FUNC(deco32_state::sound_bankswitch_w));
-	m_ym2151->add_route(0, "lspeaker", 0.42);
-	m_ym2151->add_route(1, "rspeaker", 0.42);
+	m_ym2151->add_route(0, "speaker", 0.42, 0);
+	m_ym2151->add_route(1, "speaker", 0.42, 1);
 
-	OKIM6295(config, m_oki[0], XTAL(32'220'000)/32, okim6295_device::PIN7_HIGH);  // verified on pcb; pin 7 is floating to 2.5V (left unconnected), so I presume High
-	m_oki[0]->add_route(ALL_OUTPUTS, "lspeaker", 1.0);
-	m_oki[0]->add_route(ALL_OUTPUTS, "rspeaker", 1.0);
+	OKIM6295(config, m_oki[0], 32.22_MHz_XTAL / 32, okim6295_device::PIN7_HIGH); // verified on pcb; pin 7 is floating to 2.5V (left unconnected), so I presume High
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 1.0, 0);
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 1.0, 1);
 
-	OKIM6295(config, m_oki[1], XTAL(32'220'000)/16, okim6295_device::PIN7_HIGH); // verified on pcb; pin 7 is floating to 2.5V (left unconnected), so I presume High
-	m_oki[1]->add_route(ALL_OUTPUTS, "lspeaker", 0.35);
-	m_oki[1]->add_route(ALL_OUTPUTS, "rspeaker", 0.35);
+	OKIM6295(config, m_oki[1], 32.22_MHz_XTAL / 16, okim6295_device::PIN7_HIGH); // verified on pcb; pin 7 is floating to 2.5V (left unconnected), so I presume High
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.35, 0);
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.35, 1);
 }
 
 // DE-0380-2
 void fghthist_state::fghthist(machine_config &config)
 {
-	ARM(config, m_maincpu, XTAL(28'000'000) / 4);
+	ARM(config, m_maincpu, 28_MHz_XTAL / 4);
 	m_maincpu->set_addrmap(AS_PROGRAM, &fghthist_state::fghthist_map);
 	m_maincpu->set_vblank_int("screen", FUNC(deco32_state::irq0_line_assert));
 
-	h6280_device &audiocpu(H6280(config, m_audiocpu, XTAL(32'220'000) / 8));
+	h6280_device &audiocpu(H6280(config, m_audiocpu, 32.22_MHz_XTAL / 4 / 3)); // assume same as captaven
 	audiocpu.set_addrmap(AS_PROGRAM, &fghthist_state::h6280_sound_custom_latch_map);
-	audiocpu.add_route(ALL_OUTPUTS, "lspeaker", 0); // internal sound unused
-	audiocpu.add_route(ALL_OUTPUTS, "rspeaker", 0);
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 0); // internal sound unused
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 1);
 
 	EEPROM_93C46_16BIT(config, m_eeprom);
 
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_raw(XTAL(28'000'000) / 4, 442, 0, 320, 274, 8, 248);
+	m_screen->set_raw(28_MHz_XTAL / 4, 442, 0, 320, 274, 8, 248);
 	m_screen->set_screen_update(FUNC(fghthist_state::screen_update));
 
 	GFXDECODE(config, m_gfxdecode, m_palette, gfx_fghthist);
 	PALETTE(config, m_palette).set_entries(2048);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf1_col_bank(0x00);
@@ -2012,7 +1999,7 @@ void fghthist_state::fghthist(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO16IC(config, m_deco_tilegen[1], 0);
+	DECO16IC(config, m_deco_tilegen[1]);
 	m_deco_tilegen[1]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf1_col_bank(0x20);
@@ -2025,10 +2012,10 @@ void fghthist_state::fghthist(machine_config &config)
 	m_deco_tilegen[1]->set_pf12_16x16_bank(2);
 	m_deco_tilegen[1]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO_SPRITE(config, m_sprgen[0], 0, m_palette, gfx_fghthist_spr);
+	DECO_SPRITE(config, m_sprgen[0], m_palette, gfx_fghthist_spr);
 	m_sprgen[0]->set_pri_callback(FUNC(fghthist_state::fghthist_pri_callback));
 
-	DECO146PROT(config, m_ioprot, 0);
+	DECO146PROT(config, m_ioprot);
 	m_ioprot->port_a_cb().set_ioport("IN0");
 	m_ioprot->port_b_cb().set("eeprom", FUNC(eeprom_serial_93cxx_device::do_read)).lshift(0);
 	m_ioprot->port_c_cb().set_ioport("IN1");
@@ -2036,25 +2023,24 @@ void fghthist_state::fghthist(machine_config &config)
 	m_ioprot->set_use_magic_read_address_xor(true);
 
 	// sound hardware
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
 	GENERIC_LATCH_8(config, m_soundlatch);
 	m_soundlatch->data_pending_callback().set_inputline(m_audiocpu, 0);
 
-	YM2151(config, m_ym2151, 32220000/9);
+	YM2151(config, m_ym2151, 32.22_MHz_XTAL / 9);
 	m_ym2151->irq_handler().set_inputline(m_audiocpu, 1);
 	m_ym2151->port_write_handler().set(FUNC(deco32_state::sound_bankswitch_w));
-	m_ym2151->add_route(0, "lspeaker", 0.42);
-	m_ym2151->add_route(1, "rspeaker", 0.42);
+	m_ym2151->add_route(0, "speaker", 0.42, 0);
+	m_ym2151->add_route(1, "speaker", 0.42, 1);
 
-	OKIM6295(config, m_oki[0], 32220000/32, okim6295_device::PIN7_HIGH);
-	m_oki[0]->add_route(ALL_OUTPUTS, "lspeaker", 1.0);
-	m_oki[0]->add_route(ALL_OUTPUTS, "rspeaker", 1.0);
+	OKIM6295(config, m_oki[0], 32.22_MHz_XTAL / 32, okim6295_device::PIN7_HIGH);
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 1.0, 0);
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 1.0, 1);
 
-	OKIM6295(config, m_oki[1], 32220000/16, okim6295_device::PIN7_HIGH);
-	m_oki[1]->add_route(ALL_OUTPUTS, "lspeaker", 0.35);
-	m_oki[1]->add_route(ALL_OUTPUTS, "rspeaker", 0.35);
+	OKIM6295(config, m_oki[1], 32.22_MHz_XTAL / 16, okim6295_device::PIN7_HIGH);
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.35, 0);
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.35, 1);
 }
 
 // DE-0395-1
@@ -2074,7 +2060,7 @@ void fghthist_state::fghthistu(machine_config &config)
 {
 	fghthsta(config);
 
-	Z80(config.replace(), m_audiocpu, XTAL(32'220'000) / 9);
+	Z80(config.replace(), m_audiocpu, 32.22_MHz_XTAL / 9);
 	m_audiocpu->set_addrmap(AS_PROGRAM, &fghthist_state::z80_sound_map);
 	m_audiocpu->set_addrmap(AS_IO, &fghthist_state::z80_sound_io);
 
@@ -2084,25 +2070,25 @@ void fghthist_state::fghthistu(machine_config &config)
 
 	m_ym2151->irq_handler().set("sound_irq_merger", FUNC(input_merger_any_high_device::in_w<1>));
 	m_ym2151->reset_routes();
-	m_ym2151->add_route(0, "lspeaker", 0.40);
-	m_ym2151->add_route(1, "rspeaker", 0.40);
+	m_ym2151->add_route(0, "speaker", 0.40, 0);
+	m_ym2151->add_route(1, "speaker", 0.40, 1);
 }
 
 // DE-0359-2 + Bottom board DE-0360-4
 void dragngun_state::dragngun(machine_config &config)
 {
 	// basic machine hardware
-	ARM(config, m_maincpu, XTAL(28'000'000) / 4);
+	ARM(config, m_maincpu, 28_MHz_XTAL / 4);
 	m_maincpu->set_addrmap(AS_PROGRAM, &dragngun_state::dragngun_map);
 
-	h6280_device &audiocpu(H6280(config, m_audiocpu, 32220000/8));
+	h6280_device &audiocpu(H6280(config, m_audiocpu, 32.22_MHz_XTAL / 4 / 3)); // assume same as captaven
 	audiocpu.set_addrmap(AS_PROGRAM, &dragngun_state::h6280_sound_map);
-	audiocpu.add_route(ALL_OUTPUTS, "lspeaker", 0); // internal sound unused
-	audiocpu.add_route(ALL_OUTPUTS, "rspeaker", 0);
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 0); // internal sound unused
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 1);
 
 	INPUT_MERGER_ANY_HIGH(config, "irq_merger").output_handler().set_inputline("maincpu", ARM_IRQ_LINE);
 
-	DECO_IRQ(config, m_deco_irq, 0);
+	DECO_IRQ(config, m_deco_irq);
 	m_deco_irq->set_screen_tag(m_screen);
 	m_deco_irq->raster2_irq_callback().set("irq_merger", FUNC(input_merger_any_high_device::in_w<0>));
 	m_deco_irq->vblank_irq_callback().set("irq_merger", FUNC(input_merger_any_high_device::in_w<1>));
@@ -2111,13 +2097,13 @@ void dragngun_state::dragngun(machine_config &config)
 
 	// video hardware
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_raw(XTAL(28'000'000) / 4, 442, 0, 320, 274, 8, 248);
+	m_screen->set_raw(28_MHz_XTAL / 4, 442, 0, 320, 274, 8, 248);
 	m_screen->set_screen_update(FUNC(dragngun_state::screen_update));
 	//m_screen->set_palette(m_palette);
 
 	BUFFERED_SPRITERAM32(config, m_spriteram);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf1_col_bank(0x20);
@@ -2130,7 +2116,7 @@ void dragngun_state::dragngun(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO16IC(config, m_deco_tilegen[1], 0);
+	DECO16IC(config, m_deco_tilegen[1]);
 	m_deco_tilegen[1]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf1_col_bank(0x04);
@@ -2152,7 +2138,7 @@ void dragngun_state::dragngun(machine_config &config)
 	GFXDECODE(config, m_gfxdecode, m_palette, gfx_dragngun);
 	PALETTE(config, m_palette).set_entries(2048);
 
-	DECO146PROT(config, m_ioprot, 0);
+	DECO146PROT(config, m_ioprot);
 	m_ioprot->port_a_cb().set_ioport("INPUTS");
 	m_ioprot->port_b_cb().set_ioport("SYSTEM");
 	m_ioprot->port_c_cb().set_ioport("DSW");
@@ -2160,35 +2146,37 @@ void dragngun_state::dragngun(machine_config &config)
 	m_ioprot->set_interface_scramble_reverse();
 
 	// sound hardware
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
-
-	YM2151(config, m_ym2151, 32220000/9);
-	m_ym2151->irq_handler().set_inputline(m_audiocpu, 1);
-	m_ym2151->port_write_handler().set(FUNC(deco32_state::sound_bankswitch_w));
-	m_ym2151->add_route(0, "lspeaker", 0.42);
-	m_ym2151->add_route(1, "rspeaker", 0.42);
-
-	OKIM6295(config, m_oki[0], 32220000/32, okim6295_device::PIN7_HIGH);
-	m_oki[0]->add_route(ALL_OUTPUTS, "lspeaker", 1.0);
-	m_oki[0]->add_route(ALL_OUTPUTS, "rspeaker", 1.0);
-
-	OKIM6295(config, m_oki[1], 32220000/16, okim6295_device::PIN7_HIGH);
-	m_oki[1]->add_route(ALL_OUTPUTS, "lspeaker", 0.35);
-	m_oki[1]->add_route(ALL_OUTPUTS, "rspeaker", 0.35);
+	SPEAKER(config, "speaker", 2).front();
 
 	SPEAKER(config, "gun_speaker").front_center();
 
-	OKIM6295(config, m_oki[2], 32220000/32, okim6295_device::PIN7_HIGH);
-	m_oki[2]->add_route(ALL_OUTPUTS, "gun_speaker", 1.0);
-
 	LC7535(config, m_vol_main);
-	m_vol_main->select().set_constant(1);
-	m_vol_main->set_volume_callback(FUNC(dragngun_state::volume_main_changed));
+	m_vol_main->select_cb().set_constant(1);
+	m_vol_main->add_route(0, "speaker", 1.0, 0);
+	m_vol_main->add_route(1, "speaker", 1.0, 1);
 
 	LC7535(config, m_vol_gun);
-	m_vol_gun->select().set_constant(0);
-	m_vol_gun->set_volume_callback(FUNC(dragngun_state::volume_gun_changed));
+	m_vol_gun->select_cb().set_constant(0);
+	m_vol_gun->add_route(0, "gun_speaker", 1.0);
+
+	YM2151(config, m_ym2151, 32.22_MHz_XTAL / 9);
+	m_ym2151->irq_handler().set_inputline(m_audiocpu, 1);
+	m_ym2151->port_write_handler().set(FUNC(deco32_state::sound_bankswitch_w));
+	m_ym2151->add_route(0, m_vol_main, 0.42, 0);
+	m_ym2151->add_route(1, m_vol_main, 0.42, 1);
+
+	OKIM6295(config, m_oki[0], 32.22_MHz_XTAL / 32, okim6295_device::PIN7_HIGH);
+	m_oki[0]->add_route(ALL_OUTPUTS, m_vol_main, 1.0, 0);
+	m_oki[0]->add_route(ALL_OUTPUTS, m_vol_main, 1.0, 1);
+
+	OKIM6295(config, m_oki[1], 32.22_MHz_XTAL / 16, okim6295_device::PIN7_HIGH);
+	m_oki[1]->add_route(ALL_OUTPUTS, m_vol_main, 0.35, 0);
+	m_oki[1]->add_route(ALL_OUTPUTS, m_vol_main, 0.35, 1);
+
+	OKIM6295(config, m_oki[2], 32.22_MHz_XTAL / 32, okim6295_device::PIN7_HIGH);
+	m_oki[2]->add_route(ALL_OUTPUTS, m_vol_main, 0.0, 0);
+	m_oki[2]->add_route(ALL_OUTPUTS, m_vol_main, 0.0, 1);
+	m_oki[2]->add_route(ALL_OUTPUTS, m_vol_gun, 1.0, 0);
 }
 
 void dragngun_state::lockloadu(machine_config &config)
@@ -2207,9 +2195,10 @@ void dragngun_state::lockloadu(machine_config &config)
 
 void dragngun_state::namco_sprites(machine_config &config)
 {
-	NAMCO_C355SPR(config, m_sprgenzoom, 0);
-	m_sprgenzoom->set_tile_callback(namco_c355spr_device::c355_obj_code2tile_delegate(&dragngun_state::sprite_bank_callback, this));
+	NAMCO_C355SPR(config, m_sprgenzoom);
+	m_sprgenzoom->set_tile_callback(FUNC(dragngun_state::sprite_bank_callback));
 	m_sprgenzoom->set_palette(m_palette);
+	m_sprgenzoom->set_transparent_pen(15);
 	m_sprgenzoom->set_colors(32);
 	m_sprgenzoom->set_granularity(16);
 	m_sprgenzoom->set_read_spritetile(FUNC(dragngun_state::read_spritetile));
@@ -2218,25 +2207,29 @@ void dragngun_state::namco_sprites(machine_config &config)
 	m_sprgenzoom->set_read_spritelist(FUNC(dragngun_state::read_spritelist));
 	m_sprgenzoom->set_read_cliptable(FUNC(dragngun_state::read_cliptable));
 	m_sprgenzoom->set_priority_callback(FUNC(dragngun_state::sprite_priority_callback));
-	m_sprgenzoom->set_device_allocates_spriteram_and_bitmaps(false);
+	m_sprgenzoom->set_mix_callback(FUNC(dragngun_state::sprite_mix_callback));
+	m_sprgenzoom->set_device_allocates_spriteram(false);
+	m_sprgenzoom->set_alt_precision(true);
 }
 
 // DE-0420-1 + Bottom board DE-0421-0
 void dragngun_state::lockload(machine_config &config)
 {
 	// basic machine hardware
-	ARM(config, m_maincpu, XTAL(28'000'000) / 4);
+	ARM(config, m_maincpu, 28_MHz_XTAL / 4);
 	m_maincpu->set_addrmap(AS_PROGRAM, &dragngun_state::lockload_map);
 
 	INPUT_MERGER_ANY_HIGH(config, "irq_merger").output_handler().set_inputline("maincpu", ARM_IRQ_LINE);
 
-	Z80(config, m_audiocpu, 32220000/8);
+	Z80(config, m_audiocpu, 32.22_MHz_XTAL / 9);
 	m_audiocpu->set_addrmap(AS_PROGRAM, &dragngun_state::lockload_sound_map);
 	m_audiocpu->set_addrmap(AS_IO, &dragngun_state::z80_sound_io);
 
 	INPUT_MERGER_ANY_HIGH(config, "sound_irq_merger").output_handler().set_inputline("audiocpu", INPUT_LINE_IRQ0);
 
-	DECO_IRQ(config, m_deco_irq, 0);
+	config.set_maximum_quantum(attotime::from_hz(6000));  // to improve main<->audio comms
+
+	DECO_IRQ(config, m_deco_irq);
 	m_deco_irq->set_screen_tag(m_screen);
 	m_deco_irq->lightgun1_callback().set_ioport("LIGHT0_Y");
 	m_deco_irq->lightgun2_callback().set_ioport("LIGHT1_Y");
@@ -2244,13 +2237,11 @@ void dragngun_state::lockload(machine_config &config)
 	m_deco_irq->vblank_irq_callback().set("irq_merger", FUNC(input_merger_any_high_device::in_w<1>));
 	m_deco_irq->lightgun_irq_callback().set("irq_merger", FUNC(input_merger_any_high_device::in_w<2>));
 
-	config.set_maximum_quantum(attotime::from_hz(6000));  // to improve main<->audio comms
-
 	EEPROM_93C46_16BIT(config, m_eeprom);
 
 	// video hardware
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_raw(XTAL(28'000'000) / 4, 442, 0, 320, 274, 8, 248);
+	m_screen->set_raw(28_MHz_XTAL / 4, 442, 0, 320, 274, 8, 248);
 	m_screen->set_screen_update(FUNC(dragngun_state::screen_update));
 
 	BUFFERED_SPRITERAM32(config, m_spriteram);
@@ -2258,7 +2249,7 @@ void dragngun_state::lockload(machine_config &config)
 	GFXDECODE(config, m_gfxdecode, m_palette, gfx_dragngun);
 	PALETTE(config, m_palette).set_entries(2048);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf1_col_bank(0x20);
@@ -2271,7 +2262,7 @@ void dragngun_state::lockload(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO16IC(config, m_deco_tilegen[1], 0);
+	DECO16IC(config, m_deco_tilegen[1]);
 	m_deco_tilegen[1]->set_pf1_size(DECO_32x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_32x32);    // lockload definitely wants pf34 half width..
 	m_deco_tilegen[1]->set_pf1_col_bank(0x04);
@@ -2286,7 +2277,7 @@ void dragngun_state::lockload(machine_config &config)
 
 	namco_sprites(config);
 
-	DECO146PROT(config, m_ioprot, 0);
+	DECO146PROT(config, m_ioprot);
 	m_ioprot->port_a_cb().set_ioport("INPUTS");
 	m_ioprot->port_b_cb().set_ioport("SYSTEM");
 	m_ioprot->port_c_cb().set_ioport("DSW");
@@ -2294,44 +2285,41 @@ void dragngun_state::lockload(machine_config &config)
 	m_ioprot->set_interface_scramble_reverse();
 
 	// sound hardware
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
-	YM2151(config, m_ym2151, 32220000/9);
+	YM2151(config, m_ym2151, 32.22_MHz_XTAL / 9);
 	m_ym2151->irq_handler().set("sound_irq_merger", FUNC(input_merger_any_high_device::in_w<1>));
 	m_ym2151->port_write_handler().set(FUNC(dragngun_state::lockload_okibank_lo_w));
-	m_ym2151->add_route(0, "lspeaker", 0.42);
-	m_ym2151->add_route(1, "rspeaker", 0.42);
+	m_ym2151->add_route(0, "speaker", 0.42, 0);
+	m_ym2151->add_route(1, "speaker", 0.42, 1);
 
-	OKIM6295(config, m_oki[0], 32220000/32, okim6295_device::PIN7_HIGH);
-	m_oki[0]->add_route(ALL_OUTPUTS, "lspeaker", 1.0);
-	m_oki[0]->add_route(ALL_OUTPUTS, "rspeaker", 1.0);
+	OKIM6295(config, m_oki[0], 32.22_MHz_XTAL / 32, okim6295_device::PIN7_HIGH);
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 1.0, 0);
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 1.0, 1);
 
-	OKIM6295(config, m_oki[1], 32220000/16, okim6295_device::PIN7_HIGH);
-	m_oki[1]->add_route(ALL_OUTPUTS, "lspeaker", 0.35);
-	m_oki[1]->add_route(ALL_OUTPUTS, "rspeaker", 0.35);
-
-	LC7535(config, m_vol_main);
-	m_vol_main->select().set_constant(1);
-	m_vol_main->set_volume_callback(FUNC(dragngun_state::volume_main_changed));
+	OKIM6295(config, m_oki[1], 32.22_MHz_XTAL / 16, okim6295_device::PIN7_HIGH);
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.35, 0);
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.35, 1);
 }
 
 void tattass_state::tattass(machine_config &config)
 {
 	// basic machine hardware
-	ARM(config, m_maincpu, 28000000/4); // unconfirmed
+	ARM(config, m_maincpu, 28_MHz_XTAL / 4);
 	m_maincpu->set_addrmap(AS_PROGRAM, &tattass_state::tattass_map);
 	m_maincpu->set_vblank_int("screen", FUNC(deco32_state::irq0_line_assert));
+
+	config.set_maximum_quantum(attotime::from_hz(6000)); // to improve main<->audio comms
 
 	EEPROM_93C76_8BIT(config, m_eeprom);
 
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_raw(XTAL(28'000'000) / 4, 442, 0, 320, 274, 8, 248);
+	m_screen->set_raw(28_MHz_XTAL / 4, 442, 0, 320, 274, 8, 248);
 	m_screen->set_screen_update(FUNC(tattass_state::screen_update_tattass));
 
-	DECO_ACE(config, m_deco_ace, 0);
+	DECO_ACE(config, m_deco_ace);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf1_col_bank(0x00);
@@ -2344,7 +2332,7 @@ void tattass_state::tattass(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO16IC(config, m_deco_tilegen[1], 0);
+	DECO16IC(config, m_deco_tilegen[1]);
 	m_deco_tilegen[1]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf1_col_bank(0x20);
@@ -2358,12 +2346,12 @@ void tattass_state::tattass(machine_config &config)
 	m_deco_tilegen[1]->set_pf12_16x16_bank(2);
 	m_deco_tilegen[1]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO_SPRITE(config, m_sprgen[0], 0, m_deco_ace, gfx_nslasher_spr1);
-	DECO_SPRITE(config, m_sprgen[1], 0, m_deco_ace, gfx_nslasher_spr2);
+	DECO_SPRITE(config, m_sprgen[0], m_deco_ace, gfx_nslasher_spr1);
+	DECO_SPRITE(config, m_sprgen[1], m_deco_ace, gfx_nslasher_spr2);
 
 	GFXDECODE(config, m_gfxdecode, m_deco_ace, gfx_nslasher);
 
-	DECO104PROT(config, m_ioprot, 0);
+	DECO104PROT(config, m_ioprot);
 	m_ioprot->port_a_cb().set_ioport("IN0");
 	m_ioprot->port_b_cb().set(FUNC(tattass_state::port_b_tattass));
 	m_ioprot->port_c_cb().set_ioport("IN1");
@@ -2371,38 +2359,37 @@ void tattass_state::tattass(machine_config &config)
 	m_ioprot->set_interface_scramble_interleave();
 
 	// sound hardware
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
-	DECOBSMT(config, m_decobsmt, 0);
-	m_decobsmt->add_route(0, "lspeaker", 1.0);
-	m_decobsmt->add_route(1, "rspeaker", 1.0);
+	DECOBSMT(config, m_decobsmt);
+	m_decobsmt->add_route(0, "speaker", 1.0, 0);
+	m_decobsmt->add_route(1, "speaker", 1.0, 1);
 }
 
 void nslasher_state::nslasher(machine_config &config)
 {
 	// basic machine hardware
-	ARM(config, m_maincpu, XTAL(28'322'000) / 4);
+	ARM(config, m_maincpu, 28_MHz_XTAL / 4);
 	m_maincpu->set_addrmap(AS_PROGRAM, &nslasher_state::nslasher_map);
 	m_maincpu->set_vblank_int("screen", FUNC(deco32_state::irq0_line_assert));
 
-	Z80(config, m_audiocpu, 32220000/9);
+	Z80(config, m_audiocpu, 32.22_MHz_XTAL / 9);
 	m_audiocpu->set_addrmap(AS_PROGRAM, &nslasher_state::z80_sound_map);
 	m_audiocpu->set_addrmap(AS_IO, &nslasher_state::z80_sound_io);
 
 	INPUT_MERGER_ANY_HIGH(config, "sound_irq_merger").output_handler().set_inputline("audiocpu", INPUT_LINE_IRQ0);
 
-	config.set_maximum_quantum(attotime::from_hz(6000));  // to improve main<->audio comms
+	config.set_maximum_quantum(attotime::from_hz(6000)); // to improve main<->audio comms
 
 	EEPROM_93C46_16BIT(config, m_eeprom);
 
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
-	m_screen->set_raw(XTAL(28'322'000) / 4, 442, 0, 320, 274, 8, 248);
+	m_screen->set_raw(28_MHz_XTAL / 4, 442, 0, 320, 274, 8, 248);
 	m_screen->set_screen_update(FUNC(nslasher_state::screen_update_nslasher));
 
-	DECO_ACE(config, m_deco_ace, 0);
+	DECO_ACE(config, m_deco_ace);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf1_col_bank(0x00);
@@ -2415,7 +2402,7 @@ void nslasher_state::nslasher(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO16IC(config, m_deco_tilegen[1], 0);
+	DECO16IC(config, m_deco_tilegen[1]);
 	m_deco_tilegen[1]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf1_col_bank(0x20);
@@ -2429,12 +2416,12 @@ void nslasher_state::nslasher(machine_config &config)
 	m_deco_tilegen[1]->set_pf12_16x16_bank(2);
 	m_deco_tilegen[1]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO_SPRITE(config, m_sprgen[0], 0, m_deco_ace, gfx_nslasher_spr1);
-	DECO_SPRITE(config, m_sprgen[1], 0, m_deco_ace, gfx_nslasher_spr2);
+	DECO_SPRITE(config, m_sprgen[0], m_deco_ace, gfx_nslasher_spr1);
+	DECO_SPRITE(config, m_sprgen[1], m_deco_ace, gfx_nslasher_spr2);
 
 	GFXDECODE(config, m_gfxdecode, m_deco_ace, gfx_nslasher);
 
-	DECO104PROT(config, m_ioprot, 0);
+	DECO104PROT(config, m_ioprot);
 	m_ioprot->port_a_cb().set_ioport("IN0");
 	m_ioprot->port_b_cb().set("eeprom", FUNC(eeprom_serial_93cxx_device::do_read)).lshift(0);
 	m_ioprot->port_c_cb().set_ioport("IN1");
@@ -2442,22 +2429,21 @@ void nslasher_state::nslasher(machine_config &config)
 	m_ioprot->set_interface_scramble_interleave();
 
 	// sound hardware
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
-	YM2151(config, m_ym2151, 32220000/9);
+	YM2151(config, m_ym2151, 32.22_MHz_XTAL / 9);
 	m_ym2151->irq_handler().set("sound_irq_merger", FUNC(input_merger_any_high_device::in_w<1>));
 	m_ym2151->port_write_handler().set(FUNC(deco32_state::sound_bankswitch_w));
-	m_ym2151->add_route(0, "lspeaker", 0.40);
-	m_ym2151->add_route(1, "rspeaker", 0.40);
+	m_ym2151->add_route(0, "speaker", 0.40, 0);
+	m_ym2151->add_route(1, "speaker", 0.40, 1);
 
-	OKIM6295(config, m_oki[0], 32220000/32, okim6295_device::PIN7_HIGH);
-	m_oki[0]->add_route(ALL_OUTPUTS, "lspeaker", 0.80);
-	m_oki[0]->add_route(ALL_OUTPUTS, "rspeaker", 0.80);
+	OKIM6295(config, m_oki[0], 32.22_MHz_XTAL / 32, okim6295_device::PIN7_HIGH);
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 0.80, 0);
+	m_oki[0]->add_route(ALL_OUTPUTS, "speaker", 0.80, 1);
 
-	OKIM6295(config, m_oki[1], 32220000/16, okim6295_device::PIN7_HIGH);
-	m_oki[1]->add_route(ALL_OUTPUTS, "lspeaker", 0.10);
-	m_oki[1]->add_route(ALL_OUTPUTS, "rspeaker", 0.10);
+	OKIM6295(config, m_oki[1], 32.22_MHz_XTAL / 16, okim6295_device::PIN7_HIGH);
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.10, 0);
+	m_oki[1]->add_route(ALL_OUTPUTS, "speaker", 0.10, 1);
 }
 
 // the US release uses a H6280 instead of a Z80, much like Lock 'n' Loaded
@@ -2466,10 +2452,10 @@ void nslasher_state::nslasheru(machine_config &config)
 	nslasher(config);
 	config.device_remove("audiocpu");
 
-	h6280_device &audiocpu(H6280(config, m_audiocpu, 32220000/8));
+	h6280_device &audiocpu(H6280(config, m_audiocpu, 32.22_MHz_XTAL / 4 / 3)); // assume same as captaven
 	audiocpu.set_addrmap(AS_PROGRAM, &nslasher_state::h6280_sound_map);
-	audiocpu.add_route(ALL_OUTPUTS, "lspeaker", 0); // internal sound unused
-	audiocpu.add_route(ALL_OUTPUTS, "rspeaker", 0);
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 0); // internal sound unused
+	audiocpu.add_route(ALL_OUTPUTS, "speaker", 0, 1);
 
 	config.device_remove("sound_irq_merger");
 
@@ -3622,6 +3608,79 @@ ROM_START( tattass )
 	ROM_LOAD32_WORD( "pp45.cpu", 0x000002, 0x80000, CRC(d3f30de0) SHA1(5a0aa0f96d29299b3b337b4b51bc84e447eb74d0) )
 
 	ROM_REGION(0x10000, "decobsmt:soundcpu", 0 ) // Sound CPU
+	ROM_LOAD( "u7.snd",  0x00000, 0x10000,  CRC(a7228077) SHA1(4d01575e51958a4d4686968008f5ed0a46380d70) )
+
+	ROM_REGION( 0x200000, "tiles1", 0 )
+	ROM_LOAD16_BYTE( "abak_b01.s02",  0x000000, 0x80000,  CRC(bc805680) SHA1(ccdbca23fc843ef82a3524020999542f43b3c618) )
+	ROM_LOAD16_BYTE( "abak_b01.s13",  0x000001, 0x80000,  CRC(350effcd) SHA1(0452d95be9fc28bd00d846a2cc5828899d69601e) )
+	ROM_LOAD16_BYTE( "abak_b23.s02",  0x100000, 0x80000,  CRC(91abdc21) SHA1(ba08e59bc0417e863d35ea295cf58cfe8faf57b5) )
+	ROM_LOAD16_BYTE( "abak_b23.s13",  0x100001, 0x80000,  CRC(80eb50fe) SHA1(abfe1a5417ceff9d6d52372d11993bf9b1db9432) )
+
+	ROM_REGION( 0x200000, "tiles2", 0 )
+	ROM_LOAD16_BYTE( "bbak_b01.s02",  0x000000, 0x80000,  CRC(611be9a6) SHA1(86263c8beb562e0607a65aa30fbbe030a044cd75) )
+	ROM_LOAD16_BYTE( "bbak_b01.s13",  0x000001, 0x80000,  CRC(097e0604) SHA1(6ae241b37b6bb15fc66679cf66f500b8f8a19f44) )
+	ROM_LOAD16_BYTE( "bbak_b23.s02",  0x100000, 0x80000,  CRC(3836531a) SHA1(57bead820ac396ee0ed8fb2ac5c15929896d75bf) )
+	ROM_LOAD16_BYTE( "bbak_b23.s13",  0x100001, 0x80000,  CRC(1210485a) SHA1(9edc4c96f389e231066ef164a7b2851cd7ade038) )
+
+	ROM_REGION( 0xa00000, "sprites1", 0 )
+	ROM_LOAD40_BYTE( "ob1_c0.b0",  0x000004, 0x80000,  CRC(053fecca) SHA1(319efc71042238d9012d2c3dddab9d11205decc6) )
+	ROM_LOAD40_BYTE( "ob1_c1.b0",  0x000003, 0x80000,  CRC(e183e6bc) SHA1(d9cce277861967f403a882879e1baefa84696bdc) )
+	ROM_LOAD40_BYTE( "ob1_c2.b0",  0x000002, 0x80000,  CRC(1314f828) SHA1(6a91543d4e70af30de287ba775c69ffb1cde719d) )
+	ROM_LOAD40_BYTE( "ob1_c3.b0",  0x000001, 0x80000,  CRC(c63866df) SHA1(a897835d8a33002f1bd54f27d1a6393c4e1864b9) )
+	ROM_LOAD40_BYTE( "ob1_c4.b0",  0x000000, 0x80000,  CRC(f71cdd1b) SHA1(6fbccdbe460c8ddfeed972ebe766a6f8a2d4c466) )
+
+	ROM_LOAD40_BYTE( "ob1_c0.b1",  0x280004, 0x80000,  CRC(385434b0) SHA1(ea764bd9844e13f5b10207022135dbe07bf0258a) )
+	ROM_LOAD40_BYTE( "ob1_c1.b1",  0x280003, 0x80000,  CRC(0a3ec489) SHA1(1a2e1252d6acda43019ded5a31ae60bef40e4bd9) )
+	ROM_LOAD40_BYTE( "ob1_c2.b1",  0x280002, 0x80000,  CRC(52f06081) SHA1(c630f45b110b9423dfb0bf92359fdb28b75c8cf1) )
+	ROM_LOAD40_BYTE( "ob1_c3.b1",  0x280001, 0x80000,  CRC(a8a5cfbe) SHA1(7afc8f7c7f3826a276e4840e4fc8b8bb645dd3bd) )
+	ROM_LOAD40_BYTE( "ob1_c4.b1",  0x280000, 0x80000,  CRC(09d0acd6) SHA1(1b162f5b76852e49ae6a24db2031d66ca59d87e9) )
+
+	ROM_LOAD40_BYTE( "ob1_c0.b2",  0x500004, 0x80000,  CRC(946e9f59) SHA1(46a0d35641b381fe553caa00451c30f1950b5dfd) )
+	ROM_LOAD40_BYTE( "ob1_c1.b2",  0x500003, 0x80000,  CRC(9f66ad54) SHA1(6e6ac6edee2f2dda46e7cd85db8d79c8335c73cd) )
+	ROM_LOAD40_BYTE( "ob1_c2.b2",  0x500002, 0x80000,  CRC(a8df60eb) SHA1(c971e66eec6accccaf2bdd87dde7adde79322da9) )
+	ROM_LOAD40_BYTE( "ob1_c3.b2",  0x500001, 0x80000,  CRC(a1a753be) SHA1(1666a32bb69db36dba029a835592d00a21ad8c5e) )
+	ROM_LOAD40_BYTE( "ob1_c4.b2",  0x500000, 0x80000,  CRC(b65b3c4b) SHA1(f636a682b506e3ce5ca07ba8fd3166158d1ab667) )
+
+	ROM_LOAD40_BYTE( "ob1_c0.b3",  0x780004, 0x80000,  CRC(cbbbc696) SHA1(6f2383655461ac35f3178e0f7c0146cff89c8295) )
+	ROM_LOAD40_BYTE( "ob1_c1.b3",  0x780003, 0x80000,  CRC(f7b1bdee) SHA1(1d505d8d4ede55246de0b5fbc6ca20f836699b60) )
+	ROM_LOAD40_BYTE( "ob1_c2.b3",  0x780002, 0x80000,  CRC(97815619) SHA1(b1b694310064971aa5438671d0f9992b7e4bf277) )
+	ROM_LOAD40_BYTE( "ob1_c3.b3",  0x780001, 0x80000,  CRC(fc3ccb7a) SHA1(4436fcbd830912589bd6c838eb63b7d41a2bb56e) )
+	ROM_LOAD40_BYTE( "ob1_c4.b3",  0x780000, 0x80000,  CRC(dfdfd0ff) SHA1(79dc686351d41d635359936efe97c7ade305dc84) )
+
+	ROM_REGION( 0x800000, "sprites2", 0 )
+	ROM_LOAD16_BYTE( "ob2_c0.b0",  0x000000, 0x80000,  CRC(9080ebe4) SHA1(1cfabe045532e16f203fe054449149451a280f56) )
+	ROM_LOAD16_BYTE( "ob2_c1.b0",  0x000001, 0x80000,  CRC(c0464970) SHA1(2bd87c9a7ed0742a8f1ee0c0de225e18a0351168) )
+	ROM_LOAD16_BYTE( "ob2_c2.b0",  0x400000, 0x80000,  CRC(35a2e621) SHA1(ff7687e30c379cbcee4f80c0c737cef891509881) )
+	ROM_LOAD16_BYTE( "ob2_c3.b0",  0x400001, 0x80000,  CRC(99c7cc2d) SHA1(c761e5b7f1e2afdafef36390f7141ebcb5e8f254) )
+	ROM_LOAD16_BYTE( "ob2_c0.b1",  0x100000, 0x80000,  CRC(2c2c15c9) SHA1(fdc48fab6dad97d16d4e77479fa77bb320eb3767) )
+	ROM_LOAD16_BYTE( "ob2_c1.b1",  0x100001, 0x80000,  CRC(d2c49a14) SHA1(49d92233d6d5f77fbbf9d31607c568efef6d94f0) )
+	ROM_LOAD16_BYTE( "ob2_c2.b1",  0x500000, 0x80000,  CRC(fbe957e8) SHA1(4f0bb0e434771316bcd8796878ffd3e5cafebb2b) )
+	ROM_LOAD16_BYTE( "ob2_c3.b1",  0x500001, 0x80000,  CRC(d7238829) SHA1(6fef08a518be69251852d3204413b4b8b6615be2) )
+	ROM_LOAD16_BYTE( "ob2_c0.b2",  0x200000, 0x80000,  CRC(aefa1b01) SHA1(bbd4b432b36d64f80065c56559ea9675acf3151e) )
+	ROM_LOAD16_BYTE( "ob2_c1.b2",  0x200001, 0x80000,  CRC(4af620ca) SHA1(f3753235b2e72f011c9b94f26a425b9a79577201) )
+	ROM_LOAD16_BYTE( "ob2_c2.b2",  0x600000, 0x80000,  CRC(8e58be07) SHA1(d8a8662e800da0892d70c628de0ca27ff983006c) )
+	ROM_LOAD16_BYTE( "ob2_c3.b2",  0x600001, 0x80000,  CRC(1b5188c5) SHA1(4792a36b889a2c2dfab9ec78d848d3d8bf10d20f) )
+	ROM_LOAD16_BYTE( "ob2_c0.b3",  0x300000, 0x80000,  CRC(a2a5dafd) SHA1(2baadcfe9ae8fa30ae4226caa10fe3d58f8af3e0) )
+	ROM_LOAD16_BYTE( "ob2_c1.b3",  0x300001, 0x80000,  CRC(6f0afd05) SHA1(6a4bf3466a77d14b3bc18377537f86108774badd) )
+	ROM_LOAD16_BYTE( "ob2_c2.b3",  0x700000, 0x80000,  CRC(90fe5f4f) SHA1(2149e9eae152556c632ebd4d0b2de49e40916a77) )
+	ROM_LOAD16_BYTE( "ob2_c3.b3",  0x700001, 0x80000,  CRC(e3517e6e) SHA1(68ac60570423d8f0d7cff3db1901c9c050d0be91) )
+
+	ROM_REGION(0x1000000, "decobsmt:bsmt", 0 )
+	ROM_LOAD( "u17.snd",  0x000000, 0x80000,  CRC(49303539) SHA1(3c4b6bbdcb039e355b66f72ed5ffe0bbd363f179) )
+	ROM_LOAD( "u21.snd",  0x080000, 0x80000,  CRC(0ad8bc18) SHA1(b06654e682080b3baeb7872d3c4eb3a04b22d79b) )
+	ROM_LOAD( "u36.snd",  0x100000, 0x80000,  CRC(f558947b) SHA1(57c0dc2e23beb388c1cf10a175be7dabf07da458) )
+	ROM_LOAD( "u37.snd",  0x180000, 0x80000,  CRC(7a3190bc) SHA1(e78b77268e5aa2879e7dcb5e8ff9e5dbed228cb1) )
+
+	ROM_REGION( 0x400, "eeprom", 0 )
+	ROM_LOAD( "eeprom-tattass.bin", 0x0000, 0x0400, CRC(7140f40c) SHA1(4fb7897933046b6adaf00b4626d5fd23d0e8a666) )
+ROM_END
+
+ROM_START( tattasso )
+	ROM_REGION(0x100000, "maincpu", 0 ) // ARM 32 bit code
+	ROM_LOAD32_WORD( "pp44.cpu", 0x000000, 0x80000, CRC(c3ca5b49) SHA1(c6420b0c20df1ae166b279504880ade65b1d8048) )
+	ROM_LOAD32_WORD( "pp45.cpu", 0x000002, 0x80000, CRC(d3f30de0) SHA1(5a0aa0f96d29299b3b337b4b51bc84e447eb74d0) )
+
+	ROM_REGION(0x10000, "decobsmt:soundcpu", 0 ) // Sound CPU
 	ROM_LOAD( "u7.snd",  0x00000, 0x10000,  CRC(6947be8a) SHA1(4ac6c3c7f54501f23c434708cea6bf327bc8cf95) )
 
 	ROM_REGION( 0x200000, "tiles1", 0 )
@@ -3695,7 +3754,7 @@ ROM_START( tattassa )
 	ROM_LOAD32_WORD( "rev232a.001", 0x000002, 0x80000, CRC(550245d4) SHA1(c1b2b31768da9becebd907a8622d05aa68ecaa29) )
 
 	ROM_REGION(0x10000, "decobsmt:soundcpu", 0 ) // Sound CPU
-	ROM_LOAD( "u7.snd",  0x00000, 0x10000,  CRC(6947be8a) SHA1(4ac6c3c7f54501f23c434708cea6bf327bc8cf95) )
+	ROM_LOAD( "u7.snd",  0x00000, 0x10000,  CRC(a7228077) SHA1(4d01575e51958a4d4686968008f5ed0a46380d70) )
 
 	ROM_REGION( 0x200000, "tiles1", 0 )
 	ROM_LOAD16_BYTE( "abak_b01.s02",  0x000000, 0x80000,  CRC(bc805680) SHA1(ccdbca23fc843ef82a3524020999542f43b3c618) )
@@ -3753,10 +3812,10 @@ ROM_START( tattassa )
 	ROM_LOAD16_BYTE( "ob2_c3.b3",  0x700001, 0x80000,  CRC(e3517e6e) SHA1(68ac60570423d8f0d7cff3db1901c9c050d0be91) )
 
 	ROM_REGION(0x1000000, "decobsmt:bsmt", 0 )
-	ROM_LOAD( "u17.snd",  0x000000, 0x80000,  CRC(b945c18d) SHA1(6556bbb4a7057df3680132f24687fa944006c784) )
-	ROM_LOAD( "u21.snd",  0x080000, 0x80000,  CRC(10b2110c) SHA1(83e5938ed22da2874022e1dc8df76c72d95c448d) )
-	ROM_LOAD( "u36.snd",  0x100000, 0x80000,  CRC(3b73abe2) SHA1(195096e2302e84123b23b4ccd982fb3ab9afe42c) )
-	ROM_LOAD( "u37.snd",  0x180000, 0x80000,  CRC(986066b5) SHA1(9dd1a14de81733617cf51293674a8e26fc5cec68) )
+	ROM_LOAD( "u17.snd",  0x000000, 0x80000,  CRC(49303539) SHA1(3c4b6bbdcb039e355b66f72ed5ffe0bbd363f179) )
+	ROM_LOAD( "u21.snd",  0x080000, 0x80000,  CRC(0ad8bc18) SHA1(b06654e682080b3baeb7872d3c4eb3a04b22d79b) )
+	ROM_LOAD( "u36.snd",  0x100000, 0x80000,  CRC(f558947b) SHA1(57c0dc2e23beb388c1cf10a175be7dabf07da458) )
+	ROM_LOAD( "u37.snd",  0x180000, 0x80000,  CRC(7a3190bc) SHA1(e78b77268e5aa2879e7dcb5e8ff9e5dbed228cb1) )
 
 	ROM_REGION( 0x400, "eeprom", 0 )
 	ROM_LOAD( "eeprom-tattass.bin", 0x0000, 0x0400, CRC(7140f40c) SHA1(4fb7897933046b6adaf00b4626d5fd23d0e8a666) )
@@ -3963,6 +4022,7 @@ GAME( 1994, nslashers,  nslasher, nslasher,  nslasher, nslasher_state, init_nsla
 GAME( 1994, nslasheru,  nslasher, nslasheru, nslasher, nslasher_state, init_nslasher,  ROT0, "Data East Corporation", "Night Slashers (US Rev 1.2, DE-0395-1 PCB)",         MACHINE_IMPERFECT_GRAPHICS | MACHINE_SUPPORTS_SAVE )
 
 GAME( 1994, tattass,    0,        tattass,   tattass,  tattass_state,  init_tattass,   ROT0, "Data East Pinball",     "Tattoo Assassins (US prototype, Mar 14 1995)",       MACHINE_IMPERFECT_GRAPHICS | MACHINE_SUPPORTS_SAVE )
+GAME( 1994, tattasso,   tattass,  tattass,   tattass,  tattass_state,  init_tattass,   ROT0, "Data East Pinball",     "Tattoo Assassins (US prototype, Mar 14 1995, older sound)", MACHINE_IMPERFECT_GRAPHICS | MACHINE_SUPPORTS_SAVE )
 GAME( 1994, tattassa,   tattass,  tattass,   tattass,  tattass_state,  init_tattass,   ROT0, "Data East Pinball",     "Tattoo Assassins (Asia prototype, Mar 14 1995)",     MACHINE_IMPERFECT_GRAPHICS | MACHINE_SUPPORTS_SAVE )
 
 // Dragon Gun / Locked 'n Loaded have very different sprite hardware

@@ -58,8 +58,8 @@ public:
 	void driver_init();
 
 protected:
-	virtual void machine_start() override;
-	virtual void machine_reset() override;
+	virtual void machine_start() override ATTR_COLD;
+	virtual void machine_reset() override ATTR_COLD;
 
 private:
 	// devices
@@ -90,8 +90,8 @@ private:
 
 	DECO16IC_BANK_CB_MEMBER(bank_callback);
 
-	void main_map(address_map &map);
-	void sound_map(address_map &map);
+	void main_map(address_map &map) ATTR_COLD;
+	void sound_map(address_map &map) ATTR_COLD;
 };
 
 
@@ -268,7 +268,7 @@ static INPUT_PORTS_START( vaportra )
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
-	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x0010, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0020, IP_ACTIVE_LOW, IPT_UNKNOWN )
 	PORT_BIT( 0x0040, IP_ACTIVE_LOW, IPT_UNKNOWN )
@@ -400,7 +400,7 @@ void vaportra_state::vaportra(machine_config &config)
 	GFXDECODE(config, m_gfxdecode, m_palette, gfx_vaportra);
 	PALETTE(config, m_palette).set_entries(1280);
 
-	DECO16IC(config, m_deco_tilegen[0], 0);
+	DECO16IC(config, m_deco_tilegen[0]);
 	m_deco_tilegen[0]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[0]->set_pf1_col_bank(0x00);
@@ -413,7 +413,7 @@ void vaportra_state::vaportra(machine_config &config)
 	m_deco_tilegen[0]->set_pf12_16x16_bank(1);
 	m_deco_tilegen[0]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO16IC(config, m_deco_tilegen[1], 0);
+	DECO16IC(config, m_deco_tilegen[1]);
 	m_deco_tilegen[1]->set_pf1_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf2_size(DECO_64x32);
 	m_deco_tilegen[1]->set_pf1_col_bank(0x30);
@@ -426,7 +426,7 @@ void vaportra_state::vaportra(machine_config &config)
 	m_deco_tilegen[1]->set_pf12_16x16_bank(3);
 	m_deco_tilegen[1]->set_gfxdecode_tag(m_gfxdecode);
 
-	DECO_MXC06(config, m_spritegen, 0, m_palette, gfx_vaportra_spr);
+	DECO_MXC06(config, m_spritegen, m_palette, gfx_vaportra_spr);
 	m_spritegen->set_colpri_callback(FUNC(vaportra_state::colpri_cb));
 
 	// sound hardware

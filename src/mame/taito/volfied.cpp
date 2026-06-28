@@ -82,7 +82,7 @@ public:
 	void volfied(machine_config &config);
 
 protected:
-	virtual void video_start() override;
+	virtual void video_start() override ATTR_COLD;
 
 private:
 	void video_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
@@ -97,8 +97,8 @@ private:
 
 	void refresh_pixel_layer(bitmap_ind16 &bitmap);
 
-	void main_map(address_map &map);
-	void z80_map(address_map &map);
+	void main_map(address_map &map) ATTR_COLD;
+	void z80_map(address_map &map) ATTR_COLD;
 
 	// memory pointers
 	required_shared_ptr<uint16_t> m_video_ram;
@@ -420,7 +420,7 @@ void volfied_state::volfied(machine_config &config)
 
 	PALETTE(config, "palette").set_format(palette_device::xBGR_555, 8192);
 
-	PC090OJ(config, m_pc090oj, 0);
+	PC090OJ(config, m_pc090oj);
 	m_pc090oj->set_palette("palette");
 	m_pc090oj->set_colpri_callback(FUNC(volfied_state::colpri_cb));
 
@@ -436,7 +436,7 @@ void volfied_state::volfied(machine_config &config)
 	ymsnd.add_route(2, "mono", 0.15);
 	ymsnd.add_route(3, "mono", 0.60);
 
-	pc060ha_device &ciu(PC060HA(config, "ciu", 0));
+	pc060ha_device &ciu(PC060HA(config, "ciu"));
 	ciu.nmi_callback().set_inputline(m_audiocpu, INPUT_LINE_NMI);
 	ciu.reset_callback().set_inputline(m_audiocpu, INPUT_LINE_RESET);
 }

@@ -56,6 +56,7 @@ public:
 	void wcvol95(machine_config &config);
 
 private:
+	void hvysmsh_volume_w(uint8_t data);
 	void hvysmsh_eeprom_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
 	template <unsigned Layer> uint32_t pf_rowscroll_r(offs_t offset);
 	template <unsigned Layer> void pf_rowscroll_w(offs_t offset, uint32_t data, uint32_t mem_mask = ~0);
@@ -68,8 +69,8 @@ private:
 	DECO16IC_BANK_CB_MEMBER(bank_callback);
 	DECOSPR_PRIORITY_CB_MEMBER(pri_callback);
 
-	void hvysmsh_map(address_map &map);
-	void wcvol95_map(address_map &map);
+	void hvysmsh_map(address_map &map) ATTR_COLD;
+	void wcvol95_map(address_map &map) ATTR_COLD;
 
 	/* devices */
 	required_device<arm_cpu_device> m_maincpu;
@@ -105,6 +106,18 @@ uint32_t deco156_state::screen_update(screen_device &screen, bitmap_rgb32 &bitma
 
 /***************************************************************************/
 
+// see deco32_state::volume_w
+void deco156_state::hvysmsh_volume_w(uint8_t data)
+{
+	// TODO: Assumes linear scaling
+	// values go from 0x00 (max volume) to 0xff (min volume)
+	const u8 raw_vol = 0xff - data;
+	const float vol_output = float(raw_vol) / 255.0f;
+
+	m_oki1->set_output_gain(ALL_OUTPUTS, vol_output);
+	m_oki2->set_output_gain(ALL_OUTPUTS, vol_output);
+}
+
 void deco156_state::hvysmsh_eeprom_w(offs_t offset, uint32_t data, uint32_t mem_mask)
 {
 	if (ACCESSING_BITS_0_7)
@@ -132,7 +145,7 @@ void deco156_state::hvysmsh_map(address_map &map)
 	map(0x000000, 0x0fffff).rom();
 	map(0x100000, 0x107fff).ram();
 	map(0x120000, 0x120003).portr("INPUTS");
-	map(0x120000, 0x120003).nopw(); // Volume control in low byte
+	map(0x120000, 0x120000).w(FUNC(deco156_state::hvysmsh_volume_w));
 	map(0x120004, 0x120007).w(FUNC(deco156_state::hvysmsh_eeprom_w));
 	map(0x120008, 0x12000b).nopw(); // IRQ ack?
 	map(0x12000c, 0x12000f).w(FUNC(deco156_state::hvysmsh_oki_0_bank_w));
@@ -191,11 +204,11 @@ static INPUT_PORTS_START( hvysmsh )
 	PORT_BIT( 0x00020000, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x00040000, IP_ACTIVE_LOW, IPT_SERVICE1 )
 	PORT_SERVICE_NO_TOGGLE( 0x00080000, IP_ACTIVE_LOW )
-	PORT_BIT( 0x00100000, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x00100000, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x00200000, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x00400000, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x00800000, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x01000000, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, do_read)
+	PORT_BIT( 0x01000000, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::do_read))
 	PORT_BIT( 0x02000000, IP_ACTIVE_LOW, IPT_UNUSED ) //PORT_PLAYER(1)
 	PORT_BIT( 0x04000000, IP_ACTIVE_LOW, IPT_UNUSED ) //PORT_PLAYER(1)
 	PORT_BIT( 0x08000000, IP_ACTIVE_LOW, IPT_UNUSED )
@@ -205,9 +218,9 @@ static INPUT_PORTS_START( hvysmsh )
 	PORT_BIT( 0x80000000, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_START( "EEPROMOUT" )
-	PORT_BIT( 0x00000010, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, di_write)
-	PORT_BIT( 0x00000020, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, clk_write)
-	PORT_BIT( 0x00000040, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, cs_write)
+	PORT_BIT( 0x00000010, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::di_write))
+	PORT_BIT( 0x00000020, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::clk_write))
+	PORT_BIT( 0x00000040, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::cs_write))
 INPUT_PORTS_END
 
 static INPUT_PORTS_START( wcvol95 )
@@ -233,11 +246,11 @@ static INPUT_PORTS_START( wcvol95 )
 	PORT_BIT( 0x00020000, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x00040000, IP_ACTIVE_LOW, IPT_SERVICE1 )
 	PORT_SERVICE_NO_TOGGLE( 0x00080000, IP_ACTIVE_LOW )
-	PORT_BIT( 0x00100000, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x00100000, IP_ACTIVE_LOW, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 	PORT_BIT( 0x00200000, IP_ACTIVE_LOW, IPT_UNUSED ) /* 'soundmask' */
 	PORT_BIT( 0x00400000, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x00800000, IP_ACTIVE_LOW, IPT_UNUSED )
-	PORT_BIT( 0x01000000, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, do_read)
+	PORT_BIT( 0x01000000, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::do_read))
 	PORT_BIT( 0x02000000, IP_ACTIVE_LOW, IPT_UNUSED ) //PORT_PLAYER(1)
 	PORT_BIT( 0x04000000, IP_ACTIVE_LOW, IPT_UNUSED ) //PORT_PLAYER(1)
 	PORT_BIT( 0x08000000, IP_ACTIVE_LOW, IPT_UNUSED )
@@ -247,9 +260,9 @@ static INPUT_PORTS_START( wcvol95 )
 	PORT_BIT( 0x80000000, IP_ACTIVE_LOW, IPT_UNUSED )
 
 	PORT_START( "EEPROMOUT" )
-	PORT_BIT( 0x00000001, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, di_write)
-	PORT_BIT( 0x00000002, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, clk_write)
-	PORT_BIT( 0x00000004, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", eeprom_serial_93cxx_device, cs_write)
+	PORT_BIT( 0x00000001, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::di_write))
+	PORT_BIT( 0x00000002, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::clk_write))
+	PORT_BIT( 0x00000004, IP_ACTIVE_HIGH, IPT_OUTPUT ) PORT_WRITE_LINE_DEVICE_MEMBER("eeprom", FUNC(eeprom_serial_93cxx_device::cs_write))
 INPUT_PORTS_END
 
 
@@ -331,7 +344,7 @@ void deco156_state::hvysmsh(machine_config &config)
 	GFXDECODE(config, "gfxdecode", m_palette, gfx_hvysmsh);
 	PALETTE(config, m_palette).set_format(palette_device::xBGR_888, 1024);
 
-	DECO16IC(config, m_deco_tilegen, 0);
+	DECO16IC(config, m_deco_tilegen);
 	m_deco_tilegen->set_pf1_size(DECO_64x32);
 	m_deco_tilegen->set_pf2_size(DECO_64x32);
 	m_deco_tilegen->set_pf1_col_bank(0x00);
@@ -344,7 +357,7 @@ void deco156_state::hvysmsh(machine_config &config)
 	m_deco_tilegen->set_pf12_16x16_bank(1);
 	m_deco_tilegen->set_gfxdecode_tag("gfxdecode");
 
-	DECO_SPRITE(config, m_sprgen, 0, m_palette, gfx_hvysmsh_spr);
+	DECO_SPRITE(config, m_sprgen, m_palette, gfx_hvysmsh_spr);
 	m_sprgen->set_pri_callback(FUNC(deco156_state::pri_callback));
 
 	/* sound hardware */
@@ -376,7 +389,7 @@ void deco156_state::wcvol95(machine_config &config)
 	GFXDECODE(config, "gfxdecode", m_palette, gfx_hvysmsh);
 	PALETTE(config, m_palette).set_format(palette_device::xBGR_555, 1024);
 
-	DECO16IC(config, m_deco_tilegen, 0);
+	DECO16IC(config, m_deco_tilegen);
 	m_deco_tilegen->set_pf1_size(DECO_64x32);
 	m_deco_tilegen->set_pf2_size(DECO_64x32);
 	m_deco_tilegen->set_pf1_col_bank(0x00);
@@ -389,16 +402,15 @@ void deco156_state::wcvol95(machine_config &config)
 	m_deco_tilegen->set_pf12_16x16_bank(1);
 	m_deco_tilegen->set_gfxdecode_tag("gfxdecode");
 
-	DECO_SPRITE(config, m_sprgen, 0, m_palette, gfx_hvysmsh_spr);
+	DECO_SPRITE(config, m_sprgen, m_palette, gfx_hvysmsh_spr);
 	m_sprgen->set_pri_callback(FUNC(deco156_state::pri_callback));
 
 	/* sound hardware */
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
 	ymz280b_device &ymz(YMZ280B(config, "ymz", 28000000 / 2));
-	ymz.add_route(0, "lspeaker", 1.0);
-	ymz.add_route(1, "rspeaker", 1.0);
+	ymz.add_route(0, "speaker", 1.0, 0);
+	ymz.add_route(1, "speaker", 1.0, 1);
 }
 
 

@@ -146,8 +146,8 @@ private:
 
 	uint16_t ioprot_r(offs_t offset);
 	void ioprot_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
-	void maincpu_map(address_map &map);
-	void sound_map(address_map &map);
+	void maincpu_map(address_map &map) ATTR_COLD;
+	void sound_map(address_map &map) ATTR_COLD;
 };
 
 /******************************************************************************/
@@ -264,7 +264,7 @@ static INPUT_PORTS_START( funkyjet )
 	PORT_BIT( 0x0001, IP_ACTIVE_LOW, IPT_COIN1 )
 	PORT_BIT( 0x0002, IP_ACTIVE_LOW, IPT_COIN2 )
 	PORT_BIT( 0x0004, IP_ACTIVE_LOW, IPT_SERVICE1 )
-	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_VBLANK("screen")
+	PORT_BIT( 0x0008, IP_ACTIVE_HIGH, IPT_CUSTOM ) PORT_READ_LINE_DEVICE_MEMBER("screen", FUNC(screen_device::vblank))
 
 	// Dips seem inverted with respect to other Deco games
 	PORT_START("DSW")
@@ -405,8 +405,8 @@ void funkyjet_state::funkyjet(machine_config &config)
 
 	H6280(config, m_audiocpu, XTAL(32'220'000)/4); // Custom chip 45, Audio section crystal is 32.220 MHz
 	m_audiocpu->set_addrmap(AS_PROGRAM, &funkyjet_state::sound_map);
-	m_audiocpu->add_route(ALL_OUTPUTS, "lspeaker", 0); // internal sound unused
-	m_audiocpu->add_route(ALL_OUTPUTS, "rspeaker", 0);
+	m_audiocpu->add_route(ALL_OUTPUTS, "speaker", 0, 0); // internal sound unused
+	m_audiocpu->add_route(ALL_OUTPUTS, "speaker", 0, 1);
 
 	// video hardware
 	SCREEN(config, m_screen, SCREEN_TYPE_RASTER);
@@ -417,7 +417,7 @@ void funkyjet_state::funkyjet(machine_config &config)
 	m_screen->set_screen_update(FUNC(funkyjet_state::screen_update));
 	m_screen->set_palette("palette");
 
-	DECO146PROT(config, m_deco146, 0);
+	DECO146PROT(config, m_deco146);
 	m_deco146->port_a_cb().set_ioport("INPUTS");
 	m_deco146->port_b_cb().set_ioport("SYSTEM");
 	m_deco146->port_c_cb().set_ioport("DSW");
@@ -427,7 +427,7 @@ void funkyjet_state::funkyjet(machine_config &config)
 	GFXDECODE(config, "gfxdecode", "palette", gfx_funkyjet);
 	PALETTE(config, "palette").set_format(palette_device::xBGR_444, 1024);
 
-	DECO16IC(config, m_deco_tilegen, 0);
+	DECO16IC(config, m_deco_tilegen);
 	m_deco_tilegen->set_pf1_size(DECO_64x32);
 	m_deco_tilegen->set_pf2_size(DECO_64x32);
 	m_deco_tilegen->set_pf1_col_bank(0x00);
@@ -438,20 +438,19 @@ void funkyjet_state::funkyjet(machine_config &config)
 	m_deco_tilegen->set_pf12_16x16_bank(1);
 	m_deco_tilegen->set_gfxdecode_tag("gfxdecode");
 
-	DECO_SPRITE(config, m_sprgen, 0, "palette", gfx_funkyjet_spr);
+	DECO_SPRITE(config, m_sprgen, "palette", gfx_funkyjet_spr);
 
 	// sound hardware
-	SPEAKER(config, "lspeaker").front_left();
-	SPEAKER(config, "rspeaker").front_right();
+	SPEAKER(config, "speaker", 2).front();
 
 	ym2151_device &ymsnd(YM2151(config, "ymsnd", XTAL(32'220'000)/9));
 	ymsnd.irq_handler().set_inputline(m_audiocpu, 1); // IRQ2
-	ymsnd.add_route(0, "lspeaker", 0.45);
-	ymsnd.add_route(1, "rspeaker", 0.45);
+	ymsnd.add_route(0, "speaker", 0.45, 0);
+	ymsnd.add_route(1, "speaker", 0.45, 1);
 
 	okim6295_device &oki(OKIM6295(config, "oki", XTAL(28'000'000)/28, okim6295_device::PIN7_HIGH));
-	oki.add_route(ALL_OUTPUTS, "lspeaker", 0.50);
-	oki.add_route(ALL_OUTPUTS, "rspeaker", 0.50);
+	oki.add_route(ALL_OUTPUTS, "speaker", 0.50, 0);
+	oki.add_route(ALL_OUTPUTS, "speaker", 0.50, 1);
 }
 
 /******************************************************************************/

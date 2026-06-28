@@ -2,9 +2,11 @@
 // copyright-holders:Curt Coder, Angelo Salese
 /*
 
-    http://www2.odn.ne.jp/~haf09260/Pc80/EnrPc.htm
-    http://home1.catvmics.ne.jp/~kanemoto/n80/inside.html
-    http://www.geocities.jp/retro_zzz/machines/nec/8001/index.html
+References:
+- http://www2.odn.ne.jp/~haf09260/Pc80/EnrPc.htm
+- http://home1.catvmics.ne.jp/~kanemoto/n80/inside.html
+- http://www.geocities.jp/retro_zzz/machines/nec/8001/index.html
+- https://oldcrap.org/2024/07/08/nec-pc-8001/
 
 */
 
@@ -38,11 +40,13 @@
 */
 
 #include "emu.h"
+#include "pc88_kbd.h"
 #include "pc8001.h"
 #include "screen.h"
 #include "softlist_dev.h"
 #include "speaker.h"
 #include "utf8.h"
+
 
 void pc8001_base_state::crtc_reverse_w(int state)
 {
@@ -330,16 +334,7 @@ void pc8001_state::pc8001_io(address_map &map)
 {
 	map.global_mask(0xff);
 	map.unmap_value_high();
-	map(0x00, 0x00).portr("Y0");
-	map(0x01, 0x01).portr("Y1");
-	map(0x02, 0x02).portr("Y2");
-	map(0x03, 0x03).portr("Y3");
-	map(0x04, 0x04).portr("Y4");
-	map(0x05, 0x05).portr("Y5");
-	map(0x06, 0x06).portr("Y6");
-	map(0x07, 0x07).portr("Y7");
-	map(0x08, 0x08).portr("Y8");
-	map(0x09, 0x09).portr("Y9");
+	map(0x00, 0x0f).r("kbd", FUNC(pc8001_kbd_device::read_direct));
 	map(0x10, 0x10).mirror(0x0f).w(FUNC(pc8001_state::port10_w));
 	map(0x20, 0x21).mirror(0x0e).rw(I8251_TAG, FUNC(i8251_device::read), FUNC(i8251_device::write));
 	map(0x30, 0x30).mirror(0x0f).w(FUNC(pc8001_state::port30_w));
@@ -440,106 +435,6 @@ void pc8001mk2sr_state::pc8001mk2sr_io(address_map &map)
 /* Input Ports */
 
 static INPUT_PORTS_START( pc8001 )
-	PORT_START("Y0")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_0_PAD)      PORT_CHAR(UCHAR_MAMEKEY(0_PAD))
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_1_PAD)      PORT_CHAR(UCHAR_MAMEKEY(1_PAD))
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_2_PAD)      PORT_CHAR(UCHAR_MAMEKEY(2_PAD))
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_3_PAD)      PORT_CHAR(UCHAR_MAMEKEY(3_PAD))
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_4_PAD)      PORT_CHAR(UCHAR_MAMEKEY(4_PAD))
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_5_PAD)      PORT_CHAR(UCHAR_MAMEKEY(5_PAD))
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_6_PAD)      PORT_CHAR(UCHAR_MAMEKEY(6_PAD))
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_7_PAD)      PORT_CHAR(UCHAR_MAMEKEY(7_PAD))
-
-	PORT_START("Y1")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_8_PAD)      PORT_CHAR(UCHAR_MAMEKEY(8_PAD))
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_9_PAD)      PORT_CHAR(UCHAR_MAMEKEY(9_PAD))
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_ASTERISK)   PORT_CHAR(UCHAR_MAMEKEY(ASTERISK))
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_PLUS_PAD)   PORT_CHAR(UCHAR_MAMEKEY(PLUS_PAD))
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_PGUP)       PORT_CHAR(UCHAR_MAMEKEY(EQUALS_PAD))
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_PGDN)       PORT_CHAR(UCHAR_MAMEKEY(COMMA_PAD))
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_DEL_PAD)    PORT_CHAR(UCHAR_MAMEKEY(DEL_PAD))
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME("Return") PORT_CODE(KEYCODE_ENTER) PORT_CODE(KEYCODE_ENTER_PAD) PORT_CHAR(13)
-
-	PORT_START("Y2")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_OPENBRACE)  PORT_CHAR('@')
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_A)          PORT_CHAR('a') PORT_CHAR('A')
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_B)          PORT_CHAR('b') PORT_CHAR('B')
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_C)          PORT_CHAR('c') PORT_CHAR('C')
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_D)          PORT_CHAR('d') PORT_CHAR('D')
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_E)          PORT_CHAR('e') PORT_CHAR('E')
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_F)          PORT_CHAR('f') PORT_CHAR('F')
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_G)          PORT_CHAR('g') PORT_CHAR('G')
-
-	PORT_START("Y3")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_H)          PORT_CHAR('h') PORT_CHAR('H')
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_I)          PORT_CHAR('i') PORT_CHAR('I')
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_J)          PORT_CHAR('j') PORT_CHAR('J')
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_K)          PORT_CHAR('k') PORT_CHAR('K')
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_L)          PORT_CHAR('l') PORT_CHAR('L')
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_M)          PORT_CHAR('m') PORT_CHAR('M')
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_N)          PORT_CHAR('n') PORT_CHAR('N')
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_O)          PORT_CHAR('o') PORT_CHAR('O')
-
-	PORT_START("Y4")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_P)          PORT_CHAR('p') PORT_CHAR('P')
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_Q)          PORT_CHAR('q') PORT_CHAR('Q')
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_R)          PORT_CHAR('r') PORT_CHAR('R')
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_S)          PORT_CHAR('s') PORT_CHAR('S')
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_T)          PORT_CHAR('t') PORT_CHAR('T')
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_U)          PORT_CHAR('u') PORT_CHAR('U')
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_V)          PORT_CHAR('v') PORT_CHAR('V')
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_W)          PORT_CHAR('w') PORT_CHAR('W')
-
-	PORT_START("Y5")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_X)          PORT_CHAR('x') PORT_CHAR('X')
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_Y)          PORT_CHAR('y') PORT_CHAR('Y')
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_Z)          PORT_CHAR('z') PORT_CHAR('Z')
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_CLOSEBRACE) PORT_CHAR('[')
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_BACKSLASH2) PORT_CHAR(0xA5)
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_BACKSLASH)  PORT_CHAR(']')
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_EQUALS)     PORT_CHAR('^')
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_MINUS)      PORT_CHAR('-') PORT_CHAR('=')
-
-	PORT_START("Y6")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_0)          PORT_CHAR('0')
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_1)          PORT_CHAR('1') PORT_CHAR('!')
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_2)          PORT_CHAR('2') PORT_CHAR('"')
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_3)          PORT_CHAR('3') PORT_CHAR('#')
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_4)          PORT_CHAR('4') PORT_CHAR('$')
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_5)          PORT_CHAR('5') PORT_CHAR('%')
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_6)          PORT_CHAR('6') PORT_CHAR('&')
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_7)          PORT_CHAR('7') PORT_CHAR('\'')
-
-	PORT_START("Y7")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_8)          PORT_CHAR('8') PORT_CHAR('(')
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_9)          PORT_CHAR('9') PORT_CHAR(')')
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_QUOTE)      PORT_CHAR(':') PORT_CHAR('*')
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_COLON)      PORT_CHAR(';') PORT_CHAR('+')
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_COMMA)      PORT_CHAR(',') PORT_CHAR('<')
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_STOP)       PORT_CHAR('.') PORT_CHAR('>')
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_SLASH)      PORT_CHAR('/') PORT_CHAR('?')
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME("  _") PORT_CODE(KEYCODE_DEL)           PORT_CHAR(0xff) PORT_CHAR('_')
-
-	PORT_START("Y8")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME("Clr Home") PORT_CODE(KEYCODE_HOME)     PORT_CHAR(UCHAR_MAMEKEY(HOME))
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME(UTF8_UP) PORT_CODE(KEYCODE_UP)  PORT_CHAR(UCHAR_MAMEKEY(UP)) PORT_CHAR(UCHAR_MAMEKEY(DOWN))
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME(UTF8_RIGHT) PORT_CODE(KEYCODE_RIGHT)    PORT_CHAR(UCHAR_MAMEKEY(RIGHT)) PORT_CHAR(UCHAR_MAMEKEY(LEFT))
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME("Del Ins") PORT_CODE(KEYCODE_BACKSPACE) PORT_CHAR(UCHAR_MAMEKEY(DEL)) PORT_CHAR(UCHAR_MAMEKEY(INSERT))
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME("Grph") PORT_CODE(KEYCODE_LALT) PORT_CODE(KEYCODE_RALT)
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME("Kana") PORT_CODE(KEYCODE_LCONTROL) PORT_TOGGLE
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_LSHIFT) PORT_CODE(KEYCODE_RSHIFT) PORT_CHAR(UCHAR_SHIFT_1)
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_RCONTROL)                       PORT_CHAR(UCHAR_SHIFT_2)
-
-	PORT_START("Y9")
-	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_NAME("Stop") PORT_CODE(KEYCODE_TILDE)        PORT_CHAR(3)
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_F1)                             PORT_CHAR(UCHAR_MAMEKEY(F1)) PORT_CHAR(UCHAR_MAMEKEY(F6))
-	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_F2)                             PORT_CHAR(UCHAR_MAMEKEY(F2)) PORT_CHAR(UCHAR_MAMEKEY(F7))
-	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_F3)                             PORT_CHAR(UCHAR_MAMEKEY(F3)) PORT_CHAR(UCHAR_MAMEKEY(F8))
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_F4)                             PORT_CHAR(UCHAR_MAMEKEY(F4)) PORT_CHAR(UCHAR_MAMEKEY(F9))
-	PORT_BIT( 0x20, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_F5)                             PORT_CHAR(UCHAR_MAMEKEY(F5)) PORT_CHAR(UCHAR_MAMEKEY(F10))
-	PORT_BIT( 0x40, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_SPACE)                          PORT_CHAR(' ')
-	PORT_BIT( 0x80, IP_ACTIVE_LOW, IPT_KEYBOARD ) PORT_CODE(KEYCODE_ESC)                            PORT_CHAR(27)
-
 //  PORT_START("DSW1")
 INPUT_PORTS_END
 
@@ -670,14 +565,13 @@ void pc8001_state::machine_start()
 	{
 	case 16*1024:
 		membank("bank3")->configure_entry(0, ram);
-		program.unmap_readwrite(0x6000, 0xbfff);
 		program.unmap_readwrite(0x8000, 0xbfff);
 		program.install_readwrite_bank(0xc000, 0xffff, membank("bank3"));
 		break;
 
 	case 32*1024:
 		membank("bank3")->configure_entry(0, ram);
-		program.unmap_readwrite(0x6000, 0xbfff);
+		program.unmap_readwrite(0x8000, 0xbfff);
 		program.install_readwrite_bank(0x8000, 0xffff, membank("bank3"));
 		break;
 
@@ -722,6 +616,31 @@ void pc8001mk2sr_state::machine_reset()
 	//membank("bank2")->set_entry(2);
 }
 
+/* Snapquik */
+
+SNAPSHOT_LOAD_MEMBER(pc8001_state::snapshot_cb)
+{
+	if (m_ram->size() < 0x10000)
+		return std::make_pair(image_error::UNSUPPORTED, std::string("Configured RAM size must be 64K"));
+
+	if (image.length() > 0x8000)
+		return std::make_pair(image_error::INVALIDLENGTH, std::string());
+
+	uint8_t *ram = m_ram->pointer();
+
+	std::vector<u8> snapshot(image.length());
+	image.fread(&snapshot[0], image.length());
+
+	std::copy(std::begin(snapshot), std::end(snapshot), &ram[0x8000]);
+	m_maincpu->set_state_int(Z80_SP, ram[0xff3e] | (ram[0xff3f] << 8));
+	m_maincpu->set_pc(0xff3d);
+
+	//m_maincpu->pulse_input_line(INPUT_LINE_RESET, attotime::zero);
+
+	return std::make_pair(std::error_condition(), std::string());
+}
+
+
 /* Machine Drivers */
 
 void pc8001_state::pc8001(machine_config &config)
@@ -760,7 +679,7 @@ void pc8001_state::pc8001(machine_config &config)
 	m_dma->out_iow_cb<2>().set(m_crtc, FUNC(upd3301_device::dack_w));
 
 	/* devices */
-	I8251(config, I8251_TAG, 0);
+	I8251(config, I8251_TAG);
 
 	UPD1990A(config, m_rtc);
 
@@ -777,12 +696,17 @@ void pc8001_state::pc8001(machine_config &config)
 
 	RAM(config, RAM_TAG).set_default_size("16K").set_extra_options("32K,64K");
 
-	SOFTWARE_LIST(config, "disk_n_list").set_original("pc8001_flop");
+	PC8001_KBD(config, "kbd");
 
 	/* sound hardware */
 	SPEAKER(config, "mono").front_center();
 	// TODO: unknown clock, is it really a beeper?
 	BEEP(config, m_beep, 2400).add_route(ALL_OUTPUTS, "mono", 0.25);
+
+	snapshot_image_device &snapshot(SNAPSHOT(config, "snapshot", "bin,n80", attotime::from_seconds(1)));
+	snapshot.set_load_callback(FUNC(pc8001_state::snapshot_cb));
+
+	SOFTWARE_LIST(config, "disk_n_list").set_original("pc8001_flop");
 }
 
 void pc8001mk2_state::pc8001mk2(machine_config &config)
@@ -803,6 +727,8 @@ void pc8001mk2sr_state::pc8001mk2sr(machine_config &config)
 	pc8001mk2(config);
 	m_maincpu->set_addrmap(AS_IO, &pc8001mk2sr_state::pc8001mk2sr_io);
 
+	PC8801_KBD(config.replace(), "kbd");
+
 	// TODO: mods for SR mode support
 
 	SOFTWARE_LIST(config, "disk_n80sr_list").set_original("pc8001mk2sr_flop");
@@ -812,13 +738,20 @@ void pc8001mk2sr_state::pc8001mk2sr(machine_config &config)
 
 ROM_START( pc8001 )
 	ROM_REGION( 0x8000, Z80_TAG, ROMREGION_ERASEFF )
+	ROM_DEFAULT_BIOS("v110")
 	// PCB pictures shows divided by 3 ROMs (and 4th socket unpopulated)
+	// D2364C ROMs from a pc8001b PCB:
+	// - p12019-106.ic10 072NBASIC
+	// - p11219-105.ic11 073NBASIC
+	// - p12029-106.ic12 171NBASIC
 	ROM_SYSTEM_BIOS( 0, "v101", "N-BASIC v1.01" )
 	ROMX_LOAD( "n80v101.rom", 0x00000, 0x6000, BAD_DUMP CRC(a2cc9f22) SHA1(6d2d838de7fea20ddf6601660d0525d5b17bf8a3), ROM_BIOS(0) )
 	ROM_SYSTEM_BIOS( 1, "v102", "N-BASIC v1.02" )
 	ROMX_LOAD( "n80v102.rom", 0x00000, 0x6000, BAD_DUMP CRC(ed01ca3f) SHA1(b34a98941499d5baf79e7c0e5578b81dbede4a58), ROM_BIOS(1) )
 	ROM_SYSTEM_BIOS( 2, "v110", "N-BASIC v1.10" )
 	ROMX_LOAD( "n80v110.rom", 0x00000, 0x6000, BAD_DUMP CRC(1e02d93f) SHA1(4603cdb7a3833e7feb257b29d8052c872369e713), ROM_BIOS(2) )
+	// empty socket, cfr. notes in header for usage instructions
+	ROM_LOAD( "exprom.ic13", 0x6000, 0x2000, NO_DUMP )
 
 	ROM_REGION( 0x800, CGROM_TAG, 0)
 	ROM_LOAD( "font.rom", 0x000, 0x800, CRC(56653188) SHA1(84b90f69671d4b72e8f219e1fe7cd667e976cf7f) )
@@ -846,6 +779,7 @@ ROM_START( pc8001mk2sr )
 	ROM_REGION (0x10000, N80SR_ROM_TAG, ROMREGION_ERASEFF )
 	// N80SR-BASIC v1.0
 	ROM_LOAD( "n80_3.rom",    0x0000, 0xa000, BAD_DUMP CRC(d99ef247) SHA1(9bfa5009d703cd31caa734d932d2a847d74cbfa6) )
+	// TODO: empty socket at ic77
 
 	ROM_REGION( 0x2000, CGROM_TAG, 0)
 	ROM_LOAD( "font80sr.rom", 0x000000, 0x001000, CRC(784c0b17) SHA1(565dc8e5e46b1633cb434d12b4d8b3a662546b33) )
